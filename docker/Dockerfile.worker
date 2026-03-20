@@ -6,6 +6,6 @@ ARG TARGETARCH
 RUN curl -fsSLO "https://quarto.org/download/latest/quarto-linux-${TARGETARCH}.deb" \
     && dpkg -i "quarto-linux-${TARGETARCH}.deb" \
     && rm "quarto-linux-${TARGETARCH}.deb"
-COPY api/ .
-RUN pip install --no-cache-dir ".[dev]"
-CMD ["celery", "-A", "celery_app", "worker", "--loglevel=info"]
+COPY api/ api/
+RUN pip install --no-cache-dir "./api[dev]"
+CMD ["celery", "-A", "api.celery_app", "worker", "--loglevel=info"]

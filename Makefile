@@ -17,29 +17,29 @@ build:
 # ── Testing ───────────────────────────────────────────────────────────────────
 
 test:
-	docker compose run --rm -e PYTHONPATH=/app api pytest tests/unit/ -v
+	docker compose run --rm -e PYTHONPATH=/app api pytest api/tests/unit/ -v
 
 test-int:
-	docker compose run --rm -e PYTHONPATH=/app api pytest tests/integration/ -v
+	docker compose run --rm -e PYTHONPATH=/app api pytest api/tests/integration/ -v
 
 smoke-test: up-d
 	sleep 5
-	docker compose run --rm api pytest tests/integration/ -v
+	docker compose run --rm -e PYTHONPATH=/app api pytest api/tests/integration/ -v
 	docker compose down
 
 # ── Linting & Formatting ──────────────────────────────────────────────────────
 
 lint:
-	docker compose run --rm api ruff check .
-	docker compose run --rm api black --check .
+	docker compose run --rm api ruff check api/
+	docker compose run --rm api black --check api/
 
 fmt:
-	docker compose run --rm api ruff check --fix .
-	docker compose run --rm api black .
+	docker compose run --rm api ruff check --fix api/
+	docker compose run --rm api black api/
 
 fmt-check:
-	docker compose run --rm api ruff check .
-	docker compose run --rm api black --check .
+	docker compose run --rm api ruff check api/
+	docker compose run --rm api black --check api/
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 

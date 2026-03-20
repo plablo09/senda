@@ -1,6 +1,6 @@
 from __future__ import annotations
 import asyncio
-from api.celery_app import celery_app
+from celery_app import celery_app
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=10)
 def render_documento(self, documento_id: str):
@@ -8,11 +8,11 @@ def render_documento(self, documento_id: str):
     Celery task: fetch documento → serialize to .qmd → quarto render → upload to MinIO → update DB.
     """
     import asyncio
-    from api.database import AsyncSessionLocal
-    from api.models.documento import Documento
-    from api.services.qmd_serializer import serialize_document
-    from api.services.renderer import render_qmd, RenderError
-    from api.services.storage import upload_html, ensure_bucket_exists
+    from database import AsyncSessionLocal
+    from models.documento import Documento
+    from services.qmd_serializer import serialize_document
+    from services.renderer import render_qmd, RenderError
+    from services.storage import upload_html, ensure_bucket_exists
     from sqlalchemy import select
 
     async def _run():
@@ -61,7 +61,7 @@ def cleanup_stale_containers():
     """Celery beat task: kill execution containers whose Redis session has expired."""
     import docker
     import redis as redis_lib
-    from api.config import settings
+    from config import settings
 
     r = redis_lib.from_url(settings.redis_url)
     client = docker.from_env()

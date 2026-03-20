@@ -38,8 +38,6 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.frontend
-    ports:
-      - "3000:80"
     restart: unless-stopped
 
   db:
@@ -85,6 +83,9 @@ services:
       context: .
       dockerfile: docker/Dockerfile.python-geo
     command: sleep infinity
+    labels:
+      senda.exec: "true"
+      senda.language: "python"
     deploy:
       replicas: 2
 
@@ -93,6 +94,9 @@ services:
       context: .
       dockerfile: docker/Dockerfile.r-geo
     command: sleep infinity
+    labels:
+      senda.exec: "true"
+      senda.language: "r"
     deploy:
       replicas: 2
 

@@ -15,8 +15,8 @@ class Settings(BaseSettings):
     llm_api_key: str | None = None
     secret_key: str = "dev-secret-change-in-production"
     execution_ws_url: str = "ws://localhost:8080/ws/ejecutar"
-    exec_python_image: str = "senda-python-geo"
-    exec_r_image: str = "senda-r-geo"
+    exec_python_image: str = "senda-exec-python"
+    exec_r_image: str = "senda-exec-r"
     exec_timeout_seconds: int = 30
     container_pool_size_python: int = 2
     container_pool_size_r: int = 2
