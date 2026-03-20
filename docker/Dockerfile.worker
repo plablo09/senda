@@ -5,7 +5,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev c
 RUN curl -LO https://quarto.org/download/latest/quarto-linux-amd64.deb \
     && gdebi --non-interactive quarto-linux-amd64.deb \
     && rm quarto-linux-amd64.deb
-COPY api/pyproject.toml .
-RUN pip install --no-cache-dir -e ".[dev]"
 COPY api/ .
+RUN pip install --no-cache-dir ".[dev]"
 CMD ["celery", "-A", "celery_app", "worker", "--loglevel=info"]
