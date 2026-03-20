@@ -19,7 +19,7 @@ async def ejecutar(websocket: WebSocket):
         language = payload.get("language", "python")
         code = payload.get("code", "")
 
-        async for chunk in execution_pool.execute(session_id, language, code):
+        async for chunk in execution_pool.execute(language, code):
             await websocket.send_json({
                 "tipo": chunk.tipo,
                 "contenido": chunk.contenido,

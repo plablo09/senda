@@ -53,26 +53,3 @@ def render_documento(self, documento_id: str):
                 await session.commit()
 
     asyncio.run(_run())
-
-
-@celery_app.task
-def cleanup_stale_containers():
-    """Celery beat task: kill execution containers whose Redis session has expired."""
-    import docker
-    import redis as redis_lib
-    from api.config import settings
-
-    r = redis_lib.from_url(settings.redis_url)
-    client = docker.from_env()
-
-    for container in client.containers.list(filters={"label": "senda.exec=true"}):
-        container_id = container.id[:12]
-        # Check if any session still references this container
-        matching_keys = r.keys(f"session:*:container_id")
-        active_ids = {r.get(k).decode() for k in matching_keys if r.get(k)}
-        if container_id not in active_ids:
-            try:
-                container.kill()
-                container.remove()
-            except Exception:
-                pass

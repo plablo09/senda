@@ -15,10 +15,4 @@ celery_app.conf.update(
     accept_content=["json"],
     timezone="UTC",
     enable_utc=True,
-    beat_schedule={
-        "cleanup-stale-containers": {
-            "task": "api.tasks.render_task.cleanup_stale_containers",
-            "schedule": 300.0,  # every 5 minutes
-        },
-    },
 )

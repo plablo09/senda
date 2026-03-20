@@ -4,7 +4,6 @@ import logging
 from dataclasses import dataclass, field
 from typing import AsyncIterator
 import docker
-import redis.asyncio as aioredis
 from api.config import settings
 
 logger = logging.getLogger(__name__)
@@ -73,11 +72,9 @@ class ExecutionPool:
 
     def __init__(self):
         self._docker = docker.from_env()
-        self._redis: aioredis.Redis | None = None
         self._pools: dict[str, ContainerPool] = {}
 
     async def startup(self):
-        self._redis = await aioredis.from_url(settings.redis_url)
         self._pools["python"] = ContainerPool(
             language="python",
             image=settings.exec_python_image,
@@ -93,11 +90,10 @@ class ExecutionPool:
         logger.info("Execution pool ready")
 
     async def shutdown(self):
-        if self._redis:
-            await self._redis.aclose()
+        pass
 
     async def execute(
-        self, session_id: str, language: str, code: str
+        self, language: str, code: str
     ) -> AsyncIterator[OutputChunk]:
         """
         Acquire a container, run the code, stream output chunks.
@@ -109,16 +105,11 @@ class ExecutionPool:
             return
 
         container_id = await pool.acquire()
-        # Store session → container mapping in Redis with 30min TTL
-        await self._redis.setex(f"session:{session_id}:container_id", 1800, container_id)
-        await self._redis.setex(f"session:{session_id}:language", 1800, language)
-
         try:
             async for chunk in self._run_in_container(container_id, language, code):
                 yield chunk
         finally:
             pool.release(container_id)
-            await self._redis.delete(f"session:{session_id}:container_id")
 
     async def _run_in_container(
         self, container_id: str, language: str, code: str
