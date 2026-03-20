@@ -1,0 +1,40 @@
+# Quarto
+_site/
+.quarto/
+*_files/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+.turbo/
+
+# Environment
+.env
+.env.local
+.env.production
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*.swo

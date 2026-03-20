@@ -1,0 +1,43 @@
+from __future__ import annotations
+import json
+import logging
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from api.services.execution_pool import execution_pool
+
+router = APIRouter()
+logger = logging.getLogger(__name__)
+
+@router.websocket("/ws/ejecutar")
+async def ejecutar(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        data = await websocket.receive_text()
+        payload = json.loads(data)
+
+        session_id = payload.get("session_id", str(id(websocket)))
+        exercise_id = payload.get("exercise_id", "desconocido")
+        language = payload.get("language", "python")
+        code = payload.get("code", "")
+
+        async for chunk in execution_pool.execute(session_id, language, code):
+            await websocket.send_json({
+                "tipo": chunk.tipo,
+                "contenido": chunk.contenido,
+                "exercise_id": exercise_id,
+            })
+
+    except WebSocketDisconnect:
+        logger.info("Cliente desconectado del WebSocket")
+    except json.JSONDecodeError:
+        await websocket.send_json({"tipo": "error", "contenido": "Formato de mensaje inválido."})
+    except Exception as exc:
+        logger.exception("Error en WebSocket de ejecución")
+        try:
+            await websocket.send_json({"tipo": "error", "contenido": "Error interno del servidor."})
+        except Exception:
+            pass
+    finally:
+        try:
+            await websocket.close()
+        except Exception:
+            pass

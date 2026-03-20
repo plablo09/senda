@@ -1,0 +1,34 @@
+from __future__ import annotations
+import boto3
+from botocore.client import Config
+from api.config import settings
+
+def get_s3_client():
+    return boto3.client(
+        "s3",
+        endpoint_url=settings.storage_endpoint,
+        aws_access_key_id=settings.storage_access_key,
+        aws_secret_access_key=settings.storage_secret_key,
+        config=Config(signature_version="s3v4"),
+        region_name="us-east-1",  # required by boto3, value doesn't matter for MinIO
+    )
+
+def ensure_bucket_exists():
+    """Create the bucket if it doesn't exist. Safe to call on startup."""
+    client = get_s3_client()
+    try:
+        client.head_bucket(Bucket=settings.storage_bucket)
+    except Exception:
+        client.create_bucket(Bucket=settings.storage_bucket)
+
+def upload_html(documento_id: str, html_content: bytes) -> str:
+    """Upload rendered HTML and return the public URL."""
+    client = get_s3_client()
+    key = f"documentos/{documento_id}/index.html"
+    client.put_object(
+        Bucket=settings.storage_bucket,
+        Key=key,
+        Body=html_content,
+        ContentType="text/html; charset=utf-8",
+    )
+    return f"{settings.storage_endpoint}/{settings.storage_bucket}/{key}"
