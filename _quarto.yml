@@ -1,0 +1,8 @@
+project:
+  type: website
+  output-dir: _site
+
+format:
+  senda-html:
+    theme: cosmo
+    toc: true

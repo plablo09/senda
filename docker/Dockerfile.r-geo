@@ -1,0 +1,14 @@
+# rocker/r-ver is available for arm64 and uses P3M (Posit Package Manager)
+# which provides pre-built R package binaries — no source compilation needed.
+FROM rocker/r-ver:4.4.2
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgdal-dev libproj-dev libgeos-dev libudunits2-dev \
+    && rm -rf /var/lib/apt/lists/*
+RUN Rscript -e " \
+    pkgs <- c('sf','terra','ggplot2','dplyr','tidyr','tmap','leaflet','spdep'); \
+    install.packages(pkgs); \
+    missing <- setdiff(pkgs, rownames(installed.packages())); \
+    if (length(missing) > 0) stop(paste('Failed to install:', paste(missing, collapse=', ')))"
+WORKDIR /workspace
+RUN useradd -m -u 1001 estudiante
+USER estudiante

@@ -1,0 +1,10 @@
+title: Senda Live
+author: Senda
+version: 0.1.0
+quarto-required: ">=1.4.0"
+contributes:
+  formats:
+    senda-html:
+      base-format: html
+      filters:
+        - filter.lua

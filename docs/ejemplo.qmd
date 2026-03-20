@@ -1,0 +1,48 @@
+---
+title: "Ejemplo: Análisis Geoespacial"
+format: senda-html
+params:
+  execution_url: "ws://localhost:8080/ws/ejecutar"
+---
+
+## Ejercicio Python
+
+Imprime la versión de geopandas instalada.
+
+```{python}
+#| exercise: ex_geopandas
+#| caption: "Verifica la instalación de geopandas"
+import geopandas as gpd
+print(____)
+```
+
+```{python}
+#| exercise: ex_geopandas
+#| hint: true
+# Usa gpd.__version__ para obtener la versión
+```
+
+```{python}
+#| exercise: ex_geopandas
+#| solution: true
+import geopandas as gpd
+print(gpd.__version__)
+```
+
+## Ejercicio R
+
+Verifica que el paquete sf está disponible.
+
+```{r}
+#| exercise: ex_sf
+#| caption: "Verifica la instalación de sf"
+library(sf)
+cat(as.character(packageVersion("____")))
+```
+
+```{r}
+#| exercise: ex_sf
+#| solution: true
+library(sf)
+cat(as.character(packageVersion("sf")))
+```
