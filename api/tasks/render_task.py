@@ -42,14 +42,23 @@ def render_documento(self, documento_id: str):
                 doc.url_artefacto = url
                 doc.estado_render = "listo"
                 doc.error_render = None
+                await session.commit()
             except RenderError as exc:
+                # Permanent failure — commit terminal state immediately
                 doc.estado_render = "fallido"
                 doc.error_render = str(exc)
-            except Exception as exc:
-                doc.estado_render = "fallido"
-                doc.error_render = f"Error inesperado: {exc}"
-                raise self.retry(exc=exc)
-            finally:
                 await session.commit()
+            except Exception as exc:
+                if self.request.retries >= self.max_retries:
+                    # All retries exhausted — commit terminal state
+                    doc.estado_render = "fallido"
+                    doc.error_render = f"Error inesperado: {exc}"
+                    await session.commit()
+                else:
+                    # Transient failure — reset so retry starts clean
+                    doc.estado_render = "pendiente"
+                    doc.error_render = None
+                    await session.commit()
+                    raise self.retry(exc=exc)
 
     asyncio.run(_run())
