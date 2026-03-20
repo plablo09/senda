@@ -62,9 +62,10 @@ class ContainerPool:
             await asyncio.sleep(1)
         raise TimeoutError("No hay contenedores de ejecución disponibles. Intenta de nuevo.")
 
-    def release(self, container_id: str):
+    async def release(self, container_id: str) -> None:
         """Return a container to the pool (it will be reused as-is)."""
-        self._available.append(container_id)
+        async with self._lock:
+            self._available.append(container_id)
 
 
 class ExecutionPool:
@@ -109,7 +110,7 @@ class ExecutionPool:
             async for chunk in self._run_in_container(container_id, language, code):
                 yield chunk
         finally:
-            pool.release(container_id)
+            await pool.release(container_id)
 
     async def _run_in_container(
         self, container_id: str, language: str, code: str
