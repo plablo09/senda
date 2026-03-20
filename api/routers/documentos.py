@@ -11,10 +11,7 @@ from api.database import get_db
 from api.models.documento import Documento
 from api.schemas.documento import DocumentoCreate, DocumentoResponse, DocumentoUpdate
 
-try:
-    from api.tasks.render_task import render_task
-except ImportError:
-    render_task = None  # type: ignore[assignment]
+from api.tasks.render_task import render_documento
 
 router = APIRouter(tags=["documentos"])
 
@@ -28,8 +25,8 @@ async def crear_documento(payload: DocumentoCreate, db: DbDep) -> Documento:
     await db.commit()
     await db.refresh(doc)
 
-    if payload.ast is not None and render_task is not None:
-        render_task.delay(str(doc.id))
+    if payload.ast is not None:
+        render_documento.delay(str(doc.id))
 
     return doc
 
@@ -75,8 +72,8 @@ async def actualizar_documento(
     await db.commit()
     await db.refresh(doc)
 
-    if ast_changed and render_task is not None:
-        render_task.delay(str(doc.id))
+    if ast_changed:
+        render_documento.delay(str(doc.id))
 
     return doc
 
