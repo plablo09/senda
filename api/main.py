@@ -6,8 +6,9 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import health, documentos, ejecutar
+from api.routers import health, documentos, ejecutar, datasets
 from api.services.execution_pool import execution_pool
+from api.ws import render_status as render_status_ws
 
 
 @asynccontextmanager
@@ -33,3 +34,5 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(documentos.router, prefix="/documentos")
 app.include_router(ejecutar.router)
+app.include_router(datasets.router, prefix="/datasets")
+app.include_router(render_status_ws.router)

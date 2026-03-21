@@ -43,6 +43,57 @@ def serialize_exercise(node: dict) -> str:
     return "\n".join(parts)
 
 
+def serialize_nota(node: dict) -> str:
+    attrs = node.get("attrs", {})
+    nivel = attrs.get("nivel", "tip")
+    titulo = attrs.get("titulo", "")
+    contenido = attrs.get("contenido", "")
+
+    lines = [f"::: {{.callout-{nivel}}}"]
+    if titulo:
+        lines.append(f"## {titulo}")
+    lines.append(contenido)
+    lines.append(":::")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def serialize_ecuacion(node: dict) -> str:
+    attrs = node.get("attrs", {})
+    modo = attrs.get("modo", "bloque")
+    latex = attrs.get("latex", "")
+
+    if modo == "linea":
+        return f"${latex}$\n"
+    else:
+        return f"$$\n{latex}\n$$\n"
+
+
+def serialize_cargador_datos(node: dict) -> str:
+    attrs = node.get("attrs", {})
+    language = attrs.get("language", "python")
+    mimetype = attrs.get("mimetype", "text/csv")
+    url = attrs.get("url", "")
+    variable_name = attrs.get("variableName", "datos")
+
+    if language == "python":
+        fence = "```{python}"
+        if mimetype == "text/csv":
+            code_line = f'{variable_name} = pd.read_csv("{url}")'
+        else:
+            code_line = f'{variable_name} = gpd.read_file("{url}")'
+    else:
+        fence = "```{r}"
+        if mimetype == "text/csv":
+            code_line = f'{variable_name} <- read.csv("{url}")'
+        else:
+            code_line = f'{variable_name} <- sf::st_read("{url}")'
+
+    close = "```"
+    parts = [fence, "#| exercise: false", code_line, close, ""]
+    return "\n".join(parts)
+
+
 def serialize_document(ast: dict, titulo: str = "Sin título") -> str:
     doc_meta = {
         "titulo": titulo,
@@ -56,5 +107,11 @@ def serialize_document(ast: dict, titulo: str = "Sin título") -> str:
             parts.append(serialize_text_block(node))
         elif node_type == "exercise":
             parts.append(serialize_exercise(node))
+        elif node_type == "nota":
+            parts.append(serialize_nota(node))
+        elif node_type == "ecuacion":
+            parts.append(serialize_ecuacion(node))
+        elif node_type == "cargadorDatos":
+            parts.append(serialize_cargador_datos(node))
 
     return "\n".join(parts)

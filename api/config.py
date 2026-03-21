@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     database_url: str
     redis_url: str = "redis://redis:6379"
     storage_endpoint: str = "http://minio:9000"
+    storage_public_endpoint: str = "http://localhost:9000"
     storage_access_key: str = "senda"
     storage_secret_key: str = "senda_dev"
     storage_bucket: str = "senda-documentos"
@@ -25,3 +26,11 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+DATASET_ACCEPTED_MIMETYPES: set[str] = {
+    "text/csv",
+    "application/geo+json",
+    "application/zip",
+    "application/geopackage+sqlite3",
+}
+DATASET_MAX_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB

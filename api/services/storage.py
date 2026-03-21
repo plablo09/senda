@@ -31,4 +31,23 @@ def upload_html(documento_id: str, html_content: bytes) -> str:
         Body=html_content,
         ContentType="text/html; charset=utf-8",
     )
-    return f"{settings.storage_endpoint}/{settings.storage_bucket}/{key}"
+    return f"{settings.storage_public_endpoint}/{settings.storage_bucket}/{key}"
+
+
+def upload_dataset(dataset_id: str, filename: str, content: bytes, mimetype: str) -> str:
+    """Upload a dataset file and return the public URL."""
+    client = get_s3_client()
+    key = f"datasets/{dataset_id}/{filename}"
+    client.put_object(
+        Bucket=settings.storage_bucket,
+        Key=key,
+        Body=content,
+        ContentType=mimetype,
+    )
+    return f"{settings.storage_public_endpoint}/{settings.storage_bucket}/{key}"
+
+
+def delete_object(key: str) -> None:
+    """Delete an object from storage by key."""
+    client = get_s3_client()
+    client.delete_object(Bucket=settings.storage_bucket, Key=key)

@@ -86,5 +86,17 @@ async def eliminar_documento(documento_id: uuid.UUID, db: DbDep) -> None:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Documento no encontrado",
         )
+
+    # Delete MinIO artifact if present
+    if doc.url_artefacto:
+        from api.config import settings
+        from api.services.storage import delete_object
+        prefix = f"{settings.storage_public_endpoint}/{settings.storage_bucket}/"
+        key = doc.url_artefacto[len(prefix):]
+        try:
+            delete_object(key)
+        except Exception:
+            pass
+
     await db.delete(doc)
     await db.commit()
