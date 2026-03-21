@@ -7,10 +7,10 @@ import { ecuacionBlockSpec } from "./nodes/EcuacionNode";
 export const schema = BlockNoteSchema.create({
   blockSpecs: {
     ...defaultBlockSpecs,
-    ejercicio: ejercicioBlockSpec,
-    nota: notaBlockSpec,
-    cargadorDatos: cargadorDatosBlockSpec,
-    ecuacion: ecuacionBlockSpec,
+    ejercicio: ejercicioBlockSpec(),
+    nota: notaBlockSpec(),
+    cargadorDatos: cargadorDatosBlockSpec(),
+    ecuacion: ecuacionBlockSpec(),
   },
 });
 

@@ -236,6 +236,7 @@ describe("blockNoteToAST", () => {
       {
         type: "cargadorDatos",
         props: {
+          datasetId: "ds-001",
           url: "https://data.example.com/dataset.csv",
           filename: "dataset.csv",
           mimetype: "text/csv",
@@ -250,6 +251,7 @@ describe("blockNoteToAST", () => {
       {
         type: "cargadorDatos",
         attrs: {
+          datasetId: "ds-001",
           url: "https://data.example.com/dataset.csv",
           filename: "dataset.csv",
           mimetype: "text/csv",
@@ -301,7 +303,7 @@ describe("blockNoteToAST", () => {
       },
       {
         type: "ecuacion",
-        props: { latex: "x^2", modo: "inline" },
+        props: { latex: "x^2", modo: "linea" },
         content: [],
       },
       {
@@ -327,7 +329,7 @@ describe("blockNoteToAST", () => {
     });
     expect(result.blocks[3]).toEqual({
       type: "ecuacion",
-      attrs: { latex: "x^2", modo: "inline" },
+      attrs: { latex: "x^2", modo: "linea" },
     });
     expect(result.blocks[4]).toEqual({
       type: "exercise",

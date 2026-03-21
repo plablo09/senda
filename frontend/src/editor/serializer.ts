@@ -22,7 +22,7 @@ interface ExerciseASTBlock {
   type: "exercise";
   attrs: {
     exerciseId: string;
-    language: string;
+    language: "python" | "r";
     caption: string;
     starterCode: string;
     solutionCode: string;
@@ -33,7 +33,7 @@ interface ExerciseASTBlock {
 interface NotaASTBlock {
   type: "nota";
   attrs: {
-    nivel: string;
+    nivel: "note" | "tip" | "warning" | "important";
     titulo: string;
     contenido: string;
   };
@@ -43,17 +43,18 @@ interface EcuacionASTBlock {
   type: "ecuacion";
   attrs: {
     latex: string;
-    modo: string;
+    modo: "bloque" | "linea";
   };
 }
 
 interface CargadorDatosASTBlock {
   type: "cargadorDatos";
   attrs: {
+    datasetId: string;
     url: string;
     filename: string;
     mimetype: string;
-    language: string;
+    language: "python" | "r";
     variableName: string;
   };
 }
@@ -125,11 +126,13 @@ function serializeBlock(block: Block): ASTBlock | null {
           ? rawId
           : crypto.randomUUID();
 
+      const lang: "python" | "r" =
+        language === "r" ? "r" : "python";
       return {
         type: "exercise",
         attrs: {
           exerciseId,
-          language: typeof language === "string" ? language : "python",
+          language: lang,
           caption: typeof caption === "string" ? caption : "",
           starterCode: typeof starterCode === "string" ? starterCode : "",
           solutionCode: typeof solutionCode === "string" ? solutionCode : "",
@@ -140,10 +143,12 @@ function serializeBlock(block: Block): ASTBlock | null {
 
     case "nota": {
       const { nivel, titulo, contenido } = block.props;
+      const notaNivel: "note" | "tip" | "warning" | "important" =
+        nivel === "tip" ? "tip" : nivel === "warning" ? "warning" : nivel === "important" ? "important" : "note";
       return {
         type: "nota",
         attrs: {
-          nivel: typeof nivel === "string" ? nivel : "",
+          nivel: notaNivel,
           titulo: typeof titulo === "string" ? titulo : "",
           contenido: typeof contenido === "string" ? contenido : "",
         },
@@ -152,24 +157,27 @@ function serializeBlock(block: Block): ASTBlock | null {
 
     case "ecuacion": {
       const { latex, modo } = block.props;
+      const ecuacionModo: "bloque" | "linea" = modo === "linea" ? "linea" : "bloque";
       return {
         type: "ecuacion",
         attrs: {
           latex: typeof latex === "string" ? latex : "",
-          modo: typeof modo === "string" ? modo : "bloque",
+          modo: ecuacionModo,
         },
       };
     }
 
     case "cargadorDatos": {
-      const { url, filename, mimetype, language, variableName } = block.props;
+      const { datasetId, url, filename, mimetype, language, variableName } = block.props;
+      const cargLang: "python" | "r" = language === "r" ? "r" : "python";
       return {
         type: "cargadorDatos",
         attrs: {
+          datasetId: typeof datasetId === "string" ? datasetId : "",
           url: typeof url === "string" ? url : "",
           filename: typeof filename === "string" ? filename : "",
           mimetype: typeof mimetype === "string" ? mimetype : "",
-          language: typeof language === "string" ? language : "python",
+          language: cargLang,
           variableName: typeof variableName === "string" ? variableName : "datos",
         },
       };
