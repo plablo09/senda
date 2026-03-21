@@ -409,7 +409,7 @@ export function Editor() {
             <iframe
               src={previewSrc}
               style={iframeStyle}
-              sandbox="allow-scripts allow-same-origin allow-forms"
+              sandbox="allow-scripts allow-forms"
               title="Vista previa"
             />
           ) : (

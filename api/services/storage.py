@@ -1,7 +1,16 @@
 from __future__ import annotations
+import pathlib
+import re
 import boto3
 from botocore.client import Config
 from api.config import settings
+
+
+def _sanitize_filename(filename: str) -> str:
+    """Strip directory components and replace unsafe characters."""
+    name = pathlib.Path(filename).name
+    name = re.sub(r"[^a-zA-Z0-9._-]", "_", name)
+    return name or "file"
 
 def get_s3_client():
     return boto3.client(
@@ -37,7 +46,8 @@ def upload_html(documento_id: str, html_content: bytes) -> str:
 def upload_dataset(dataset_id: str, filename: str, content: bytes, mimetype: str) -> str:
     """Upload a dataset file and return the public URL."""
     client = get_s3_client()
-    key = f"datasets/{dataset_id}/{filename}"
+    safe_name = _sanitize_filename(filename)
+    key = f"datasets/{dataset_id}/{safe_name}"
     client.put_object(
         Bucket=settings.storage_bucket,
         Key=key,

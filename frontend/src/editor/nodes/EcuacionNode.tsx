@@ -88,6 +88,7 @@ function EcuacionUI({
     try {
       return katex.renderToString(latex || "\\square", {
         throwOnError: false,
+        trust: false,
         displayMode: safeModo === "bloque",
       });
     } catch {

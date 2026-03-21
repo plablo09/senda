@@ -129,7 +129,7 @@ class TestSerializeExercise:
     def test_starter_code_only_produces_one_fenced_block(self):
         node = self._make_node(starterCode="x = ____", solutionCode="", hints=[])
         result = serialize_exercise(node)
-        assert result.count("```{python}") == 1
+        assert result.count("~~~~~{python}") == 1
 
     def test_starter_code_has_exercise_option(self):
         node = self._make_node(exerciseId="ej1", starterCode="x = ____")
@@ -144,7 +144,7 @@ class TestSerializeExercise:
     def test_with_solution_produces_two_fenced_blocks(self):
         node = self._make_node(starterCode="x = ____", solutionCode="x = 42")
         result = serialize_exercise(node)
-        assert result.count("```{python}") == 2
+        assert result.count("~~~~~{python}") == 2
 
     def test_solution_block_has_solution_option(self):
         node = self._make_node(starterCode="x = ____", solutionCode="x = 42")
@@ -154,7 +154,7 @@ class TestSerializeExercise:
     def test_with_one_hint_produces_two_fenced_blocks(self):
         node = self._make_node(starterCode="x = ____", solutionCode="", hints=["Try 42"])
         result = serialize_exercise(node)
-        assert result.count("```{python}") == 2
+        assert result.count("~~~~~{python}") == 2
 
     def test_hint_block_has_hint_option(self):
         node = self._make_node(starterCode="x = ____", hints=["Try 42"])
@@ -165,7 +165,7 @@ class TestSerializeExercise:
         node = self._make_node(starterCode="x = ____", hints=["Hint A", "Hint B", "Hint C"])
         result = serialize_exercise(node)
         # 1 exercise + 3 hints = 4 blocks
-        assert result.count("```{python}") == 4
+        assert result.count("~~~~~{python}") == 4
         assert result.count("#| hint: true") == 3
 
     def test_with_all_three_correct_order(self):
@@ -183,13 +183,13 @@ class TestSerializeExercise:
     def test_language_python_uses_python_fence(self):
         node = self._make_node(language="python")
         result = serialize_exercise(node)
-        assert "```{python}" in result
+        assert "~~~~~{python}" in result
 
     def test_language_r_uses_r_fence(self):
         node = self._make_node(language="r")
         result = serialize_exercise(node)
-        assert "```{r}" in result
-        assert "```{python}" not in result
+        assert "~~~~~{r}" in result
+        assert "~~~~~{python}" not in result
 
     def test_placeholder_preserved_as_is(self):
         node = self._make_node(starterCode="result = ____\nprint(____)")
@@ -253,7 +253,7 @@ class TestSerializeDocument:
             ]
         }
         result = serialize_document(ast, titulo="Doc")
-        assert "```{python}" in result
+        assert "~~~~~{python}" in result
         assert "#| exercise: ej1" in result
 
     def test_ast_with_text_and_exercise(self):
@@ -275,7 +275,7 @@ class TestSerializeDocument:
         }
         result = serialize_document(ast, titulo="Full Doc")
         assert "Intro text." in result
-        assert "```{python}" in result
+        assert "~~~~~{python}" in result
         assert "#| exercise: ej2" in result
         assert "#| solution: true" in result
 

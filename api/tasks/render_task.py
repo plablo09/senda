@@ -108,8 +108,9 @@ def reset_stale_procesando():
             for doc in stale:
                 doc.estado_render = "fallido"
                 doc.error_render = "Tiempo de procesamiento agotado"
-                _publish_render_status(str(doc.id), "fallido", None, doc.error_render)
             if stale:
                 await session.commit()
+                for doc in stale:
+                    _publish_render_status(str(doc.id), "fallido", None, doc.error_render)
 
     asyncio.run(_run())

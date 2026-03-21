@@ -8,6 +8,7 @@ export function useRenderStatus(documentoId: string | null) {
   const [errorRender, setErrorRender] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const wsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Use a ref to track terminal state to avoid stale closure in ws.onclose
   const isTerminalRef = useRef<boolean>(false);
 
@@ -23,6 +24,8 @@ export function useRenderStatus(documentoId: string | null) {
       wsRef.current = null;
       if (pollRef.current) clearInterval(pollRef.current);
       pollRef.current = null;
+      if (wsTimeoutRef.current) clearTimeout(wsTimeoutRef.current);
+      wsTimeoutRef.current = null;
     }
 
     function startPolling() {
@@ -49,6 +52,12 @@ export function useRenderStatus(documentoId: string | null) {
       `${protocol}//${location.host}/ws/documentos/${docId}/estado`,
     );
     wsRef.current = ws;
+
+    // Fallback: if the WS connects but no message arrives within 20s, start polling.
+    // Guards against the race where the render completes before the server subscribes to Redis.
+    wsTimeoutRef.current = setTimeout(() => {
+      if (!isTerminalRef.current) startPolling();
+    }, 20_000);
 
     ws.onmessage = (event: MessageEvent) => {
       const data = JSON.parse(event.data as string) as {

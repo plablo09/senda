@@ -1,5 +1,23 @@
 from __future__ import annotations
+import re
 import yaml
+
+
+def _strip_newlines(s: str) -> str:
+    """Remove newlines from single-line fields that are interpolated into QMD directives."""
+    return s.replace("\n", " ").replace("\r", " ")
+
+
+def _escape_string_literal(s: str) -> str:
+    """Escape a value for safe use inside a double-quoted Python/R string literal."""
+    return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
+def _validate_identifier(name: str, fallback: str) -> str:
+    """Return name if it is a valid Python/R identifier, otherwise return fallback."""
+    if re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', name):
+        return name
+    return fallback
 
 DEFAULT_EXECUTION_URL = "ws://localhost:8080/ws/ejecutar"
 
@@ -23,14 +41,15 @@ def serialize_text_block(node: dict) -> str:
 def serialize_exercise(node: dict) -> str:
     attrs = node.get("attrs", {})
     lang = attrs.get("language", "python")
-    exercise_id = attrs.get("exerciseId", "ejercicio")
-    caption = attrs.get("caption", "Ejercicio")
+    exercise_id = _strip_newlines(attrs.get("exerciseId", "ejercicio"))
+    caption = _strip_newlines(attrs.get("caption", "Ejercicio"))
     starter = attrs.get("starterCode", "")
     solution = attrs.get("solutionCode", "")
     hints = attrs.get("hints", [])
 
-    fence = f"```{{{lang}}}"
-    close = "```"
+    # Use tilde fences so user code containing ``` cannot close the fence early
+    fence = f"~~~~~{{{lang}}}"
+    close = "~~~~~"
 
     parts = [fence, f"#| exercise: {exercise_id}", f'#| caption: "{caption}"', starter, close, ""]
 
@@ -73,8 +92,8 @@ def serialize_cargador_datos(node: dict) -> str:
     attrs = node.get("attrs", {})
     language = attrs.get("language", "python")
     mimetype = attrs.get("mimetype", "text/csv")
-    url = attrs.get("url", "")
-    variable_name = attrs.get("variableName", "datos")
+    url = _escape_string_literal(attrs.get("url", ""))
+    variable_name = _validate_identifier(attrs.get("variableName", "datos"), "datos")
 
     if language == "python":
         fence = "```{python}"

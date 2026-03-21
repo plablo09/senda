@@ -2,6 +2,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import uuid
 
 import redis.asyncio as aioredis
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -13,11 +14,12 @@ logger = logging.getLogger(__name__)
 
 
 @router.websocket("/ws/documentos/{documento_id}/estado")
-async def render_status(websocket: WebSocket, documento_id: str):
+async def render_status(websocket: WebSocket, documento_id: uuid.UUID):
+    doc_id = str(documento_id)
     await websocket.accept()
     redis_client = aioredis.from_url(settings.redis_url)
     pubsub = redis_client.pubsub()
-    await pubsub.subscribe(f"render:{documento_id}")
+    await pubsub.subscribe(f"render:{doc_id}")
 
     async def forward_redis():
         try:
@@ -46,7 +48,7 @@ async def render_status(websocket: WebSocket, documento_id: str):
     except Exception:
         logger.exception("Error en WebSocket de estado de render")
     finally:
-        await pubsub.unsubscribe(f"render:{documento_id}")
+        await pubsub.unsubscribe(f"render:{doc_id}")
         await redis_client.aclose()
         try:
             await websocket.close()
