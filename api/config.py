@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+from pydantic import computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     database_url: str
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def sync_database_url(self) -> str:
+        """Synchronous DB URL for Alembic (psycopg2 instead of asyncpg)."""
+        return self.database_url.replace("+asyncpg", "+psycopg2")
     redis_url: str = "redis://redis:6379"
     storage_endpoint: str = "http://minio:9000"
     storage_public_endpoint: str = "http://localhost:9000"

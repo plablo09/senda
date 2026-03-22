@@ -1,4 +1,4 @@
-.PHONY: up down build test test-int lint fmt fmt-check shell-api shell-db logs logs-llm smoke-test
+.PHONY: up down build test test-int lint fmt fmt-check shell-api shell-db logs logs-llm smoke-test migrate migrate-down revision
 
 # ── Stack ─────────────────────────────────────────────────────────────────────
 
@@ -54,3 +54,14 @@ logs:
 
 logs-llm:
 	docker compose logs -f ollama
+
+# ── Migrations ────────────────────────────────────────────────────────────────
+
+migrate:
+	docker compose run --rm -e PYTHONPATH=/app api alembic upgrade head
+
+migrate-down:
+	docker compose run --rm -e PYTHONPATH=/app api alembic downgrade -1
+
+revision:
+	docker compose run --rm -e PYTHONPATH=/app api alembic revision --autogenerate -m "$(MSG)"

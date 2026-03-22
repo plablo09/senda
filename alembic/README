@@ -1,0 +1,6 @@
+Alembic migration environment for Senda.
+
+Run migrations:
+  make migrate           # apply all pending migrations
+  make migrate-down      # roll back one step
+  make revision MSG="..."  # generate a new migration revision

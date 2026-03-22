@@ -1,4 +1,18 @@
 services:
+  migrator:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    command: alembic upgrade head
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /app
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
   api:
     build:
       context: .
@@ -12,9 +26,14 @@ services:
       LLM_API_BASE: ${LLM_API_BASE:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
     depends_on:
-      - db
-      - redis
-      - minio
+      db:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
     restart: unless-stopped
 
   worker:
@@ -28,9 +47,14 @@ services:
       LLM_API_BASE: ${LLM_API_BASE:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
     depends_on:
-      - db
-      - redis
-      - minio
+      db:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
     restart: unless-stopped
 
   frontend:
@@ -51,6 +75,11 @@ services:
       POSTGRES_PASSWORD: senda
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U senda -d senda"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
   redis:
