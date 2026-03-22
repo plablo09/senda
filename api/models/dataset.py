@@ -1,6 +1,7 @@
 from __future__ import annotations
 import uuid
 from datetime import datetime, UTC
+import sqlalchemy as sa
 from sqlalchemy import DateTime, String, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 from api.database import Base
@@ -12,5 +13,10 @@ class Dataset(Base):
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
     mimetype: Mapped[str] = mapped_column(String(100), nullable=False)
-    es_publico: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+    es_publico: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa.false(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        server_default=sa.text("NOW()"),
+        nullable=False,
+    )

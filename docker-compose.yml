@@ -70,9 +70,9 @@ services:
   db:
     image: postgres:16
     environment:
-      POSTGRES_DB: senda
-      POSTGRES_USER: senda
-      POSTGRES_PASSWORD: senda
+      POSTGRES_DB: ${POSTGRES_DB:-senda}
+      POSTGRES_USER: ${POSTGRES_USER:-senda}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -93,8 +93,8 @@ services:
       MINIO_ROOT_USER: senda
       MINIO_ROOT_PASSWORD: senda_dev
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - minio_data:/data
     restart: unless-stopped

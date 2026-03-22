@@ -1,4 +1,4 @@
-.PHONY: up down build test test-int lint fmt fmt-check shell-api shell-db logs logs-llm smoke-test migrate migrate-down revision
+.PHONY: up down build test test-int lint fmt shell-api shell-db logs logs-llm smoke-test migrate migrate-down revision migrate-check migrate-current
 
 # ── Stack ─────────────────────────────────────────────────────────────────────
 
@@ -37,10 +37,6 @@ fmt:
 	docker compose run --rm api ruff check --fix api/
 	docker compose run --rm api black api/
 
-fmt-check:
-	docker compose run --rm api ruff check api/
-	docker compose run --rm api black --check api/
-
 # ── Utilities ─────────────────────────────────────────────────────────────────
 
 shell-api:
@@ -58,10 +54,16 @@ logs-llm:
 # ── Migrations ────────────────────────────────────────────────────────────────
 
 migrate:
-	docker compose run --rm -e PYTHONPATH=/app api alembic upgrade head
+	docker compose run --rm migrator
 
 migrate-down:
 	docker compose run --rm -e PYTHONPATH=/app api alembic downgrade -1
+
+migrate-check:
+	docker compose run --rm -e PYTHONPATH=/app api alembic check
+
+migrate-current:
+	docker compose run --rm -e PYTHONPATH=/app api alembic current
 
 revision:
 	docker compose run --rm -e PYTHONPATH=/app api alembic revision --autogenerate -m "$(MSG)"

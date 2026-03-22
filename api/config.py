@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     @property
     def sync_database_url(self) -> str:
         """Synchronous DB URL for Alembic (psycopg2 instead of asyncpg)."""
+        if "+asyncpg" not in self.database_url:
+            raise ValueError(
+                f"DATABASE_URL must use the +asyncpg scheme; got: {self.database_url!r}"
+            )
         return self.database_url.replace("+asyncpg", "+psycopg2")
     redis_url: str = "redis://redis:6379"
     storage_endpoint: str = "http://minio:9000"

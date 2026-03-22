@@ -14,8 +14,6 @@ from api.ws import render_status as render_status_ws
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # DB schema is managed by Alembic migrations (run via the migrator service at startup)
-    import api.models.ejecucion_error  # noqa: F401 — registers EjecucionError with Base.metadata
-
     await execution_pool.startup()
     yield
     await execution_pool.shutdown()

@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, UTC
 
+import sqlalchemy as sa
 from sqlalchemy import DateTime, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,17 +20,21 @@ class Documento(Base):
     titulo: Mapped[str] = mapped_column(String(500), nullable=False)
     ast: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     qmd_source: Mapped[str | None] = mapped_column(Text, nullable=True)
-    estado_render: Mapped[str] = mapped_column(String(50), default="pendiente", nullable=False)
+    estado_render: Mapped[str] = mapped_column(
+        String(50), default="pendiente", server_default="pendiente", nullable=False
+    )
     url_artefacto: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     error_render: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),
+        server_default=sa.text("NOW()"),
         nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),
+        server_default=sa.text("NOW()"),
         onupdate=lambda: datetime.now(UTC),
         nullable=False,
     )
