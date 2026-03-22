@@ -18,7 +18,7 @@ def _make_llm_response(content: str):
 
 @pytest.mark.asyncio
 async def test_successful_structured_response():
-    """Valid JSON from LLM is parsed into (diagnostico, pregunta_guia, mostrar_pista)."""
+    """Valid JSON from LLM is parsed into (diagnostico, pregunta_guia, mostrar_pista, referencia_concepto)."""
     payload = {
         "diagnostico": "El error indica que la variable 'df' no está definida.",
         "pregunta_guia": "¿En qué línea declaras la variable 'df' por primera vez?",
@@ -28,7 +28,7 @@ async def test_successful_structured_response():
     mock_response = _make_llm_response(json.dumps(payload))
 
     with patch("api.services.llm_feedback.litellm.acompletion", new=AsyncMock(return_value=mock_response)):
-        diagnostico, pregunta_guia, mostrar_pista = await generar_retroalimentacion(
+        diagnostico, pregunta_guia, mostrar_pista, referencia_concepto = await generar_retroalimentacion(
             codigo_estudiante="df.head()",
             error_output="NameError: name 'df' is not defined",
             ejercicio_id="ej-1",
@@ -37,6 +37,7 @@ async def test_successful_structured_response():
     assert diagnostico == payload["diagnostico"]
     assert pregunta_guia == payload["pregunta_guia"]
     assert mostrar_pista is True
+    assert referencia_concepto == "DataFrame de pandas"
 
 
 @pytest.mark.asyncio
@@ -45,7 +46,7 @@ async def test_json_parse_failure_returns_fallback():
     mock_response = _make_llm_response("Lo siento, no puedo ayudarte.")
 
     with patch("api.services.llm_feedback.litellm.acompletion", new=AsyncMock(return_value=mock_response)):
-        diagnostico, pregunta_guia, mostrar_pista = await generar_retroalimentacion(
+        diagnostico, pregunta_guia, mostrar_pista, referencia_concepto = await generar_retroalimentacion(
             codigo_estudiante="x = 1",
             error_output="SyntaxError",
             ejercicio_id="ej-2",
@@ -54,6 +55,7 @@ async def test_json_parse_failure_returns_fallback():
     assert diagnostico == _FALLBACK_MESSAGE
     assert pregunta_guia is None
     assert mostrar_pista is False
+    assert referencia_concepto is None
 
 
 @pytest.mark.asyncio
@@ -63,7 +65,7 @@ async def test_litellm_exception_returns_fallback():
         "api.services.llm_feedback.litellm.acompletion",
         new=AsyncMock(side_effect=Exception("quota exceeded")),
     ):
-        diagnostico, pregunta_guia, mostrar_pista = await generar_retroalimentacion(
+        diagnostico, pregunta_guia, mostrar_pista, referencia_concepto = await generar_retroalimentacion(
             codigo_estudiante="import geopandas",
             error_output="ModuleNotFoundError",
             ejercicio_id="ej-3",
@@ -72,6 +74,7 @@ async def test_litellm_exception_returns_fallback():
     assert diagnostico == _FALLBACK_MESSAGE
     assert pregunta_guia is None
     assert mostrar_pista is False
+    assert referencia_concepto is None
 
 
 @pytest.mark.asyncio
@@ -81,7 +84,7 @@ async def test_missing_fields_use_defaults():
     mock_response = _make_llm_response(json.dumps(payload))
 
     with patch("api.services.llm_feedback.litellm.acompletion", new=AsyncMock(return_value=mock_response)):
-        diagnostico, pregunta_guia, mostrar_pista = await generar_retroalimentacion(
+        diagnostico, pregunta_guia, mostrar_pista, referencia_concepto = await generar_retroalimentacion(
             codigo_estudiante="1 + 'a'",
             error_output="TypeError",
             ejercicio_id="ej-4",
@@ -90,3 +93,4 @@ async def test_missing_fields_use_defaults():
     assert diagnostico == "Error de tipo."
     assert pregunta_guia is None
     assert mostrar_pista is True  # default
+    assert referencia_concepto is None

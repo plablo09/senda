@@ -175,10 +175,10 @@ function mountEditor(container, initialCode, language) {
 /* ─── Session identity ──────────────────────────────────────────────────── */
 
 function getSessionId() {
-  let id = sessionStorage.getItem('senda_session_id');
+  let id = localStorage.getItem('senda_session_id');
   if (!id) {
     id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
-    sessionStorage.setItem('senda_session_id', id);
+    localStorage.setItem('senda_session_id', id);
   }
   return id;
 }
@@ -246,14 +246,14 @@ function ejecutarCodigo(params) {
       case 'error': {
         // System-level error (pool exhausted, unsupported language)
         appendOutput(outputDiv, contenido, 'out-error');
-        solicitarRetroalimentacion(exerciseId, contenido, getEditorValue, feedbackDiv);
+        solicitarRetroalimentacion(exerciseId, contenido, () => code, feedbackDiv);
         break;
       }
       case 'fin':
       case 'done': {
         // Trigger feedback if any stderr (Python/R tracebacks) was collected
         if (stderrAccumulated.trim()) {
-          solicitarRetroalimentacion(exerciseId, stderrAccumulated, getEditorValue, feedbackDiv);
+          solicitarRetroalimentacion(exerciseId, stderrAccumulated, () => code, feedbackDiv);
         }
         const span = document.createElement('span');
         span.className = 'out-success';
@@ -298,7 +298,11 @@ function appendOutput(container, text, cssClass) {
 /* ─── AI feedback ───────────────────────────────────────────────────────── */
 
 async function solicitarRetroalimentacion(exerciseId, errorOutput, getCode, feedbackDiv) {
-  feedbackDiv.innerHTML = '<em>Obteniendo retroalimentación...</em>';
+  feedbackDiv.replaceChildren();
+  const loading = document.createElement('em');
+  loading.textContent = 'Obteniendo retroalimentación…';
+  feedbackDiv.appendChild(loading);
+
   try {
     const codigoEstudiante = typeof getCode === 'function' ? getCode() : '';
     const resp = await fetch(`/api/retroalimentacion/${encodeURIComponent(exerciseId)}`, {
@@ -315,22 +319,34 @@ async function solicitarRetroalimentacion(exerciseId, errorOutput, getCode, feed
 
     // Silence window — student should try independently
     if (data.silencio && !data.limite) {
-      feedbackDiv.innerHTML = '';
+      feedbackDiv.replaceChildren();
       return;
     }
+
+    feedbackDiv.replaceChildren();
 
     // Hard limit reached
     if (data.limite) {
-      feedbackDiv.innerHTML = `<em>${escapeHtml(data.retroalimentacion)}</em>`;
+      const em = document.createElement('em');
+      em.textContent = data.retroalimentacion;
+      feedbackDiv.appendChild(em);
       return;
     }
 
-    let html = `<strong>Retroalimentación:</strong> ${escapeHtml(data.retroalimentacion)}`;
+    const label = document.createElement('strong');
+    label.textContent = 'Retroalimentación: ';
+    feedbackDiv.appendChild(label);
+    feedbackDiv.appendChild(document.createTextNode(data.retroalimentacion));
+
     if (data.pregunta_guia) {
-      html += `<br><strong>Para reflexionar:</strong> ${escapeHtml(data.pregunta_guia)}`;
+      feedbackDiv.appendChild(document.createElement('br'));
+      const reflLabel = document.createElement('strong');
+      reflLabel.textContent = 'Para reflexionar: ';
+      feedbackDiv.appendChild(reflLabel);
+      feedbackDiv.appendChild(document.createTextNode(data.pregunta_guia));
     }
-    feedbackDiv.innerHTML = html;
   } catch (_) {
+    feedbackDiv.replaceChildren();
     feedbackDiv.textContent = 'No se pudo obtener retroalimentación en este momento.';
   }
 }

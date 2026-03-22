@@ -16,8 +16,8 @@ class EjecucionError(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    documento_id: Mapped[str] = mapped_column(String(36), nullable=False)
-    ejercicio_id: Mapped[str] = mapped_column(String(500), nullable=False)
+    documento_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    ejercicio_id: Mapped[str] = mapped_column(String(255), nullable=False)
     session_id: Mapped[str] = mapped_column(String(36), nullable=False)
     error_tipo: Mapped[str] = mapped_column(String(50), nullable=False)
     error_output: Mapped[str | None] = mapped_column(Text, nullable=True)

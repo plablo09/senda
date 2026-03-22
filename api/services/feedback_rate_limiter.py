@@ -1,10 +1,30 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 
 import redis.asyncio as aioredis
 
 from api.config import settings
+
+_REDIS_TTL_SECONDS = 7 * 86400  # 7 days
+
+# Module-level client; created lazily so tests can inject a mock before first call.
+_redis_client: aioredis.Redis | None = None
+
+
+def _get_redis() -> aioredis.Redis:
+    global _redis_client
+    if _redis_client is None:
+        _redis_client = aioredis.from_url(settings.redis_url)
+    return _redis_client
+
+
+def _make_key(session_id: str, ejercicio_id: str) -> str:
+    """Hash user-controlled values to prevent key injection."""
+    sid = hashlib.sha256(session_id.encode()).hexdigest()[:32]
+    eid = hashlib.sha256(ejercicio_id.encode()).hexdigest()[:16]
+    return f"feedback:{sid}:{eid}"
 
 
 @dataclass
@@ -24,10 +44,10 @@ async def check_and_update(session_id: str, ejercicio_id: str) -> RateLimitDecis
     3. attempts_since_feedback < window → increment attempts, return silencio
     4. attempts_since_feedback >= window → give feedback, reset attempts
     """
-    key = f"feedback:{session_id}:{ejercicio_id}"
-    redis_client = aioredis.from_url(settings.redis_url)
+    key = _make_key(session_id, ejercicio_id)
+    redis = _get_redis()
     try:
-        raw = await redis_client.hgetall(key)
+        raw = await redis.hgetall(key)
         total_feedbacks = int(raw.get(b"total_feedbacks", 0))
         attempts_since_feedback = int(raw.get(b"attempts_since_feedback", 0))
 
@@ -36,28 +56,28 @@ async def check_and_update(session_id: str, ejercicio_id: str) -> RateLimitDecis
 
         if total_feedbacks == 0:
             # First error ever — always give feedback
-            await redis_client.hset(key, mapping={"total_feedbacks": 1, "attempts_since_feedback": 0})
+            await redis.hset(key, mapping={"total_feedbacks": 1, "attempts_since_feedback": 0})
+            await redis.expire(key, _REDIS_TTL_SECONDS)
             return RateLimitDecision(should_give_feedback=True)
 
         if total_feedbacks >= max_responses:
             return RateLimitDecision(should_give_feedback=False, silencio=True, limite=True)
 
         if attempts_since_feedback < silence_window:
-            await redis_client.hincrby(key, "attempts_since_feedback", 1)
+            await redis.hincrby(key, "attempts_since_feedback", 1)
             return RateLimitDecision(should_give_feedback=False, silencio=True)
 
         # Silence window exhausted — give next feedback
-        await redis_client.hset(
+        await redis.hset(
             key,
             mapping={
                 "total_feedbacks": total_feedbacks + 1,
                 "attempts_since_feedback": 0,
             },
         )
+        await redis.expire(key, _REDIS_TTL_SECONDS)
         return RateLimitDecision(should_give_feedback=True)
 
     except Exception:
         # Redis unavailable — fail open: give feedback, skip rate limiting
         return RateLimitDecision(should_give_feedback=True)
-    finally:
-        await redis_client.aclose()

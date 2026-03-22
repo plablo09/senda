@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 
@@ -12,6 +13,9 @@ logger = logging.getLogger(__name__)
 _FALLBACK_MESSAGE = (
     "No pudimos obtener retroalimentación en este momento. Intenta revelar una pista."
 )
+
+_LLM_TIMEOUT_SECONDS = 15.0
+_LLM_SEMAPHORE = asyncio.Semaphore(6)  # cap concurrent LLM calls
 
 _SYSTEM_PROMPT = """\
 Eres un tutor de análisis estadístico y geográfico. Tu rol es guiar al estudiante
@@ -32,9 +36,9 @@ async def generar_retroalimentacion(
     codigo_estudiante: str,
     error_output: str,
     ejercicio_id: str,
-) -> tuple[str, str | None, bool]:
+) -> tuple[str, str | None, bool, str | None]:
     """
-    Call the LLM and return (diagnostico, pregunta_guia, mostrar_pista).
+    Call the LLM and return (diagnostico, pregunta_guia, mostrar_pista, referencia_concepto).
     Returns a fallback tuple on any failure.
     """
     user_message = (
@@ -58,16 +62,21 @@ async def generar_retroalimentacion(
         kwargs["api_key"] = settings.llm_api_key
 
     try:
-        response = await litellm.acompletion(**kwargs)
+        async with _LLM_SEMAPHORE:
+            response = await asyncio.wait_for(
+                litellm.acompletion(**kwargs),
+                timeout=_LLM_TIMEOUT_SECONDS,
+            )
         content = response.choices[0].message.content or ""
         data = json.loads(content)
         diagnostico = str(data.get("diagnostico", _FALLBACK_MESSAGE))
         pregunta_guia = data.get("pregunta_guia")
         mostrar_pista = bool(data.get("mostrar_pista", True))
-        return diagnostico, pregunta_guia, mostrar_pista
+        referencia_concepto = data.get("referencia_concepto")
+        return diagnostico, pregunta_guia, mostrar_pista, referencia_concepto
     except (json.JSONDecodeError, KeyError, IndexError) as exc:
         logger.warning("LLM response parse error: %s", exc)
-        return _FALLBACK_MESSAGE, None, False
+        return _FALLBACK_MESSAGE, None, False, None
     except Exception as exc:
         logger.warning("LLM call failed: %s", exc)
-        return _FALLBACK_MESSAGE, None, False
+        return _FALLBACK_MESSAGE, None, False, None
