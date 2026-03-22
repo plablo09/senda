@@ -8,14 +8,13 @@ services:
     env_file:
       - .env
     environment:
-      LLM_MODEL: ${LLM_MODEL:-ollama/llama3.2}
-      LLM_API_BASE: ${LLM_API_BASE:-http://ollama:11434}
+      LLM_MODEL: ${LLM_MODEL:-gemini/gemini-2.0-flash}
+      LLM_API_BASE: ${LLM_API_BASE:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
     depends_on:
       - db
       - redis
       - minio
-      - ollama
     restart: unless-stopped
 
   worker:
@@ -25,8 +24,8 @@ services:
     env_file:
       - .env
     environment:
-      LLM_MODEL: ${LLM_MODEL:-ollama/llama3.2}
-      LLM_API_BASE: ${LLM_API_BASE:-http://ollama:11434}
+      LLM_MODEL: ${LLM_MODEL:-gemini/gemini-2.0-flash}
+      LLM_API_BASE: ${LLM_API_BASE:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
     depends_on:
       - db
@@ -105,6 +104,7 @@ services:
       replicas: 2
 
   ollama:
+    profiles: [ollama]
     image: ollama/ollama
     volumes:
       - ollama_data:/root/.ollama

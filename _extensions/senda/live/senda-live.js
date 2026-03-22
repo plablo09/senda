@@ -172,6 +172,17 @@ function mountEditor(container, initialCode, language) {
   return false;
 }
 
+/* ─── Session identity ──────────────────────────────────────────────────── */
+
+function getSessionId() {
+  let id = sessionStorage.getItem('senda_session_id');
+  if (!id) {
+    id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+    sessionStorage.setItem('senda_session_id', id);
+  }
+  return id;
+}
+
 /* ─── WebSocket execution ───────────────────────────────────────────────── */
 
 function ejecutarCodigo(params) {
@@ -182,6 +193,9 @@ function ejecutarCodigo(params) {
   outputDiv.style.display = 'block';
   runBtn.disabled = true;
   runBtn.textContent = '⏳ Ejecutando...';
+
+  // Collect stderr across chunks; trigger feedback at "fin" if non-empty
+  let stderrAccumulated = '';
 
   let ws;
   try {
@@ -219,6 +233,7 @@ function ejecutarCodigo(params) {
         break;
       case 'stderr':
         appendOutput(outputDiv, contenido, 'out-error');
+        stderrAccumulated += contenido;
         break;
       case 'imagen':
       case 'image': {
@@ -229,12 +244,17 @@ function ejecutarCodigo(params) {
         break;
       }
       case 'error': {
+        // System-level error (pool exhausted, unsupported language)
         appendOutput(outputDiv, contenido, 'out-error');
         solicitarRetroalimentacion(exerciseId, contenido, getEditorValue, feedbackDiv);
         break;
       }
       case 'fin':
       case 'done': {
+        // Trigger feedback if any stderr (Python/R tracebacks) was collected
+        if (stderrAccumulated.trim()) {
+          solicitarRetroalimentacion(exerciseId, stderrAccumulated, getEditorValue, feedbackDiv);
+        }
         const span = document.createElement('span');
         span.className = 'out-success';
         span.textContent = '✓ Ejecución completada\n';
@@ -286,13 +306,30 @@ async function solicitarRetroalimentacion(exerciseId, errorOutput, getCode, feed
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         codigo_estudiante: codigoEstudiante,
-        error_output: errorOutput
+        error_output: errorOutput,
+        session_id: getSessionId()
       })
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
-    const mensaje = data.retroalimentacion || data.feedback || data.message || JSON.stringify(data);
-    feedbackDiv.innerHTML = `<strong>Retroalimentación:</strong> ${escapeHtml(mensaje)}`;
+
+    // Silence window — student should try independently
+    if (data.silencio && !data.limite) {
+      feedbackDiv.innerHTML = '';
+      return;
+    }
+
+    // Hard limit reached
+    if (data.limite) {
+      feedbackDiv.innerHTML = `<em>${escapeHtml(data.retroalimentacion)}</em>`;
+      return;
+    }
+
+    let html = `<strong>Retroalimentación:</strong> ${escapeHtml(data.retroalimentacion)}`;
+    if (data.pregunta_guia) {
+      html += `<br><strong>Para reflexionar:</strong> ${escapeHtml(data.pregunta_guia)}`;
+    }
+    feedbackDiv.innerHTML = html;
   } catch (_) {
     feedbackDiv.textContent = 'No se pudo obtener retroalimentación en este momento.';
   }
