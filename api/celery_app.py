@@ -15,4 +15,10 @@ celery_app.conf.update(
     accept_content=["json"],
     timezone="UTC",
     enable_utc=True,
+    beat_schedule={
+        "reset-stale-procesando": {
+            "task": "api.tasks.render_task.reset_stale_procesando",
+            "schedule": 300.0,  # every 5 minutes
+        },
+    },
 )
