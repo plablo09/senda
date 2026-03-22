@@ -1,7 +1,7 @@
 ---
 title: "feat: LLM Student Guidance (Phase 3)"
 type: feat
-status: active
+status: completed
 date: 2026-03-22
 origin: docs/brainstorms/2026-03-22-llm-student-guidance-requirements.md
 ---
