@@ -38,7 +38,7 @@ status: fixed
 
 Six security and correctness issues found during code review of Phase 2 (block editor implementation). None were individually exotic — each is a well-known pattern violation. They cluster around three subsystems: file upload, QMD code generation, and real-time status delivery.
 
-**Fixes pending** — issues identified in review, not yet applied. See the fix section for each.
+**Fixed** — all issues were applied before merging Phase 2 (commit `fix(security): address 8 review findings before merge`, 2026-03-21). See also: [`phase-3-llm-guidance-pre-merge-review-fixes.md`](phase-3-llm-guidance-pre-merge-review-fixes.md) for the analogous Phase 3 cluster.
 
 **Related plan:** `docs/plans/2026-03-20-002-feat-block-editor-teacher-authoring-plan.md`
 
