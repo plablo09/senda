@@ -11,9 +11,11 @@ class Settings(BaseSettings):
     storage_access_key: str = "senda"
     storage_secret_key: str = "senda_dev"
     storage_bucket: str = "senda-documentos"
-    llm_model: str = "ollama/llama3.2"
-    llm_api_base: str | None = "http://ollama:11434"
+    llm_model: str = "gemini/gemini-2.0-flash"
+    llm_api_base: str | None = None
     llm_api_key: str | None = None
+    feedback_silence_window: int = 2
+    feedback_max_responses: int = 3
     secret_key: str = "dev-secret-change-in-production"
     execution_ws_url: str = "ws://localhost:8080/ws/ejecutar"
     exec_python_image: str = "senda-exec-python"
