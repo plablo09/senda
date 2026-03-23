@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     feedback_silence_window: int = 2
     feedback_max_responses: int = 3
     secret_key: str = "dev-secret-change-in-production"
+    cookie_secure: bool = False
+    cors_allowed_origins: list[str] = ["http://localhost:8080"]
+    access_token_expire_minutes: int = 15
+    refresh_token_expire_days: int = 7
     execution_ws_url: str = "ws://localhost:8080/ws/ejecutar"
     exec_python_image: str = "senda-exec-python"
     exec_r_image: str = "senda-exec-r"
