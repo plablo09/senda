@@ -1,21 +1,17 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.database import get_db
+from api.database import DbDep
 from api.models.documento import Documento
 from api.schemas.documento import DocumentoCreate, DocumentoResponse, DocumentoUpdate
 
 from api.tasks.render_task import render_documento
 
 router = APIRouter(tags=["documentos"])
-
-DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 
 @router.post("", response_model=DocumentoResponse, status_code=status.HTTP_201_CREATED)

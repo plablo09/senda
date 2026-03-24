@@ -11,6 +11,8 @@ from alembic import context
 import api.models.documento  # noqa: F401
 import api.models.ejecucion_error  # noqa: F401
 import api.models.dataset  # noqa: F401
+import api.models.usuario  # noqa: F401
+import api.models.sesion_refresh  # noqa: F401
 
 from api.database import Base
 from api.config import settings

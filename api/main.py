@@ -6,7 +6,8 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import health, documentos, ejecutar, datasets, retroalimentacion
+from api.config import settings
+from api.routers import auth, datasets, documentos, ejecutar, health, retroalimentacion
 from api.services.execution_pool import execution_pool
 from api.ws import render_status as render_status_ws
 
@@ -23,12 +24,14 @@ app = FastAPI(title="Senda API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten in production
+    allow_origins=settings.cors_allowed_origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(health.router)
+app.include_router(auth.router, prefix="/auth")
 app.include_router(documentos.router, prefix="/documentos")
 app.include_router(ejecutar.router)
 app.include_router(datasets.router, prefix="/datasets")
