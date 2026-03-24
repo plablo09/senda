@@ -52,14 +52,16 @@ async def create_refresh_token(
     return token, jti
 
 
-def verify_access_token(token: str) -> TokenPayload:
+async def verify_access_token(token: str) -> TokenPayload:
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[_ALGORITHM])
-        return TokenPayload(sub=payload["sub"], rol=payload["rol"])
+        payload = await asyncio.to_thread(
+            jwt.decode, token, settings.secret_key, algorithms=[_ALGORITHM]
+        )
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expirado")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
+    return TokenPayload(sub=payload["sub"], rol=payload["rol"])
 
 
 async def revoke_refresh_token(jti: uuid.UUID, db: AsyncSession) -> None:

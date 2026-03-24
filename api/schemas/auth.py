@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -10,7 +9,6 @@ from pydantic import BaseModel, Field
 class UsuarioCreate(BaseModel):
     email: str = Field(max_length=320)
     password: str = Field(min_length=8, max_length=128)
-    rol: Literal["teacher", "student"]
 
 
 class UsuarioResponse(BaseModel):

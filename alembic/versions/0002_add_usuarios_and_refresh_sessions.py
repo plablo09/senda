@@ -42,7 +42,6 @@ def upgrade() -> None:
             server_default=sa.text("NOW()"),
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("email"),
     )
     op.create_index("ix_usuarios_email", "usuarios", ["email"], unique=True)
 
@@ -60,7 +59,6 @@ def upgrade() -> None:
             server_default=sa.text("NOW()"),
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("jti"),
         sa.ForeignKeyConstraint(["user_id"], ["usuarios.id"], ondelete="CASCADE"),
     )
     op.create_index("ix_sesiones_refresh_jti", "sesiones_refresh", ["jti"], unique=True)

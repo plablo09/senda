@@ -4,20 +4,21 @@ import uuid
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.database import get_db
+from api.database import DbDep
 from api.models.usuario import Usuario
 from api.services.auth_service import verify_access_token
-
-DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 
 async def get_current_user(request: Request, db: DbDep) -> Usuario:
     token = request.cookies.get("access_token")
     if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+    if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
-    payload = verify_access_token(token)
+    payload = await verify_access_token(token)
     user = await db.get(Usuario, uuid.UUID(payload.sub))
     if not user or not user.is_active:
         raise HTTPException(

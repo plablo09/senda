@@ -2,11 +2,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, HTTPException, UploadFile, status
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from api.database import get_db
+from api.database import DbDep
 from api.models.dataset import Dataset
 from api.schemas.dataset import DatasetResponse
 from api.services.storage import upload_dataset, delete_object
@@ -15,7 +13,6 @@ from api.config import DATASET_ACCEPTED_MIMETYPES, DATASET_MAX_SIZE_BYTES
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["datasets"])
-DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 
 @router.post("", response_model=DatasetResponse, status_code=status.HTTP_201_CREATED)
