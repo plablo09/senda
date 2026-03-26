@@ -12,6 +12,12 @@ from api.database import Base
 
 class Documento(Base):
     __tablename__ = "documentos"
+    __table_args__ = (
+        sa.CheckConstraint(
+            "estado_render IN ('pendiente', 'procesando', 'listo', 'fallido')",
+            name="ck_documento_estado_render",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True,

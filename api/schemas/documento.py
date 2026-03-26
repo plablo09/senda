@@ -3,7 +3,11 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
+from typing import Literal
+
 from pydantic import BaseModel
+
+EstadoRender = Literal["pendiente", "procesando", "listo", "fallido"]
 
 
 class DocumentoCreate(BaseModel):
@@ -21,7 +25,7 @@ class DocumentoResponse(BaseModel):
     titulo: str
     ast: dict | None
     qmd_source: str | None
-    estado_render: str
+    estado_render: EstadoRender
     url_artefacto: str | None
     error_render: str | None
     created_at: datetime
