@@ -14,6 +14,12 @@ class DocumentoCreate(BaseModel):
     titulo: str
     ast: dict | None = None
 
+    @model_validator(mode="after")
+    def ast_schema_version(self) -> "DocumentoCreate":
+        if self.ast is not None and "schemaVersion" not in self.ast:
+            raise ValueError("ast debe incluir el campo 'schemaVersion'")
+        return self
+
 
 class DocumentoUpdate(BaseModel):
     titulo: str | None = None
