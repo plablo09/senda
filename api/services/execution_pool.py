@@ -101,7 +101,20 @@ class ExecutionPool:
             async for chunk in self._run_in_container(container_id, language, code):
                 yield chunk
         finally:
+            await self._cleanup_container(container_id)
             await pool.release(container_id)
+
+    async def _cleanup_container(self, container_id: str) -> None:
+        """Wipe /tmp and /workspace before returning the container to the pool."""
+        try:
+            container = await asyncio.to_thread(self._docker.containers.get, container_id)
+            await asyncio.to_thread(
+                container.exec_run,
+                ["sh", "-c", "rm -rf /tmp/* /workspace/*"],
+                user="root",
+            )
+        except Exception:
+            logger.warning("Cleanup failed for container %s; it will be retired", container_id[:12])
 
     async def _run_in_container(
         self, container_id: str, language: str, code: str
