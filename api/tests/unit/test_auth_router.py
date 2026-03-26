@@ -10,6 +10,10 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+from api.limiter import limiter
 from api.routers import auth as auth_router
 from api.database import get_db
 
@@ -25,6 +29,8 @@ async def _noop_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 _test_app = FastAPI(lifespan=_noop_lifespan)
+_test_app.state.limiter = limiter
+_test_app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 _test_app.include_router(auth_router.router, prefix="/auth")
 
 

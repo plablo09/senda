@@ -11,6 +11,7 @@ from api.models.sesion_refresh import SesionRefresh
 from api.models.usuario import Usuario
 from api.dependencies.auth import CurrentUser
 from api.schemas.auth import LoginRequest, UsuarioCreate, UsuarioResponse
+from api.limiter import limiter
 from api.services.auth_service import (
     create_access_token,
     create_refresh_token,
@@ -48,7 +49,8 @@ def _clear_auth_cookies(response: Response) -> None:
 
 
 @router.post("/registro", response_model=UsuarioResponse, status_code=status.HTTP_201_CREATED)
-async def registro(payload: UsuarioCreate, db: DbDep) -> Usuario:
+@limiter.limit("5/minute")
+async def registro(request: Request, payload: UsuarioCreate, db: DbDep) -> Usuario:
     result = await db.execute(select(Usuario).where(Usuario.email == payload.email))
     if result.scalar_one_or_none() is not None:
         raise HTTPException(
@@ -63,7 +65,8 @@ async def registro(payload: UsuarioCreate, db: DbDep) -> Usuario:
 
 
 @router.post("/login")
-async def login(payload: LoginRequest, response: Response, db: DbDep) -> dict:
+@limiter.limit("10/minute")
+async def login(request: Request, payload: LoginRequest, response: Response, db: DbDep) -> dict:
     result = await db.execute(select(Usuario).where(Usuario.email == payload.email))
     user = result.scalar_one_or_none()
     if not user or not user.hashed_password or not user.is_active:
@@ -81,6 +84,7 @@ async def login(payload: LoginRequest, response: Response, db: DbDep) -> dict:
 
 
 @router.post("/logout")
+@limiter.limit("20/minute")
 async def logout(request: Request, response: Response, db: DbDep) -> dict:
     refresh_token = request.cookies.get("refresh_token")
     if refresh_token:
@@ -94,6 +98,7 @@ async def logout(request: Request, response: Response, db: DbDep) -> dict:
 
 
 @router.post("/refresh")
+@limiter.limit("30/minute")
 async def refresh(request: Request, response: Response, db: DbDep) -> dict:
     token = request.cookies.get("refresh_token")
     if not token:

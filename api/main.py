@@ -5,8 +5,11 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from api.config import settings
+from api.limiter import limiter
 from api.routers import auth, datasets, documentos, ejecutar, health, retroalimentacion
 from api.services.execution_pool import execution_pool
 from api.ws import render_status as render_status_ws
@@ -21,6 +24,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(title="Senda API", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
