@@ -2,10 +2,23 @@ from __future__ import annotations
 import json
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from api.schemas.ejecutar import EjecucionRequest, EjecucionResponse, OutputChunkResponse
 from api.services.execution_pool import execution_pool
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+@router.post("/ejecutar", response_model=EjecucionResponse)
+async def ejecutar_http(payload: EjecucionRequest) -> EjecucionResponse:
+    """HTTP endpoint for code execution — collects all output chunks and returns JSON.
+    Useful for agents, CI pipelines, and curl. The WebSocket endpoint at /ws/ejecutar
+    remains available for interactive browser use.
+    """
+    chunks = []
+    async for chunk in execution_pool.execute(payload.language, payload.code):
+        chunks.append(OutputChunkResponse(tipo=chunk.tipo, contenido=chunk.contenido))
+    return EjecucionResponse(chunks=chunks)
 
 @router.websocket("/ws/ejecutar")
 async def ejecutar(websocket: WebSocket):
