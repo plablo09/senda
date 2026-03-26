@@ -18,54 +18,45 @@ class ContainerPool:
     language: str
     image: str
     size: int
-    _available: list = field(default_factory=list)
-    _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    _queue: asyncio.Queue = field(default_factory=asyncio.Queue)
 
     async def initialize(self, docker_client: docker.DockerClient):
         """Reuse existing running containers with matching labels, then start new ones to fill the pool."""
-        async with self._lock:
-            # Check for already-running containers (e.g. started by docker-compose)
-            existing = await asyncio.to_thread(
-                docker_client.containers.list,
-                filters={"label": [f"senda.exec=true", f"senda.language={self.language}"], "status": "running"},
-            )
-            for container in existing:
-                self._available.append(container.id)
-                logger.info(
-                    "Reusing existing container %s for %s", container.id[:12], self.language
-                )
+        existing = await asyncio.to_thread(
+            docker_client.containers.list,
+            filters={"label": [f"senda.exec=true", f"senda.language={self.language}"], "status": "running"},
+        )
+        for container in existing:
+            await self._queue.put(container.id)
+            logger.info("Reusing existing container %s for %s", container.id[:12], self.language)
 
-            # Start additional containers if we have fewer than `size`
-            needed = self.size - len(self._available)
-            for _ in range(needed):
-                container = await asyncio.to_thread(
-                    docker_client.containers.run,
-                    self.image,
-                    command="sleep infinity",
-                    detach=True,
-                    labels={"senda.exec": "true", "senda.language": self.language},
-                    mem_limit="512m",
-                    cpu_quota=50000,  # 50% of one CPU
-                    network_mode="none",  # no network access for execution containers
-                    read_only=False,  # need /tmp write access
-                    tmpfs={"/tmp": "size=100m"},
-                )
-                self._available.append(container.id)
-                logger.info("Pre-warmed container %s for %s", container.id[:12], self.language)
+        needed = self.size - self._queue.qsize()
+        for _ in range(needed):
+            container = await asyncio.to_thread(
+                docker_client.containers.run,
+                self.image,
+                command="sleep infinity",
+                detach=True,
+                labels={"senda.exec": "true", "senda.language": self.language},
+                mem_limit="512m",
+                cpu_quota=50000,  # 50% of one CPU
+                network_mode="none",  # no network access for execution containers
+                read_only=False,  # need /tmp write access
+                tmpfs={"/tmp": "size=100m"},
+            )
+            await self._queue.put(container.id)
+            logger.info("Pre-warmed container %s for %s", container.id[:12], self.language)
 
     async def acquire(self) -> str:
-        """Get an available container ID. Waits up to 60s if pool is exhausted."""
-        for _ in range(60):
-            async with self._lock:
-                if self._available:
-                    return self._available.pop(0)
-            await asyncio.sleep(1)
-        raise TimeoutError("No hay contenedores de ejecución disponibles. Intenta de nuevo.")
+        """Get an available container ID. Wakes immediately on release; waits up to 60s if pool exhausted."""
+        try:
+            return await asyncio.wait_for(self._queue.get(), timeout=60.0)
+        except asyncio.TimeoutError:
+            raise TimeoutError("No hay contenedores de ejecución disponibles. Intenta de nuevo.")
 
     async def release(self, container_id: str) -> None:
-        """Return a container to the pool (it will be reused as-is)."""
-        async with self._lock:
-            self._available.append(container_id)
+        """Return a container to the pool; waiters are notified immediately."""
+        await self._queue.put(container_id)
 
 
 class ExecutionPool:
