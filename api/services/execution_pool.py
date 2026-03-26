@@ -2,7 +2,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import AsyncIterator
+from typing import AsyncIterator, Literal
 import docker
 from api.config import settings
 
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class OutputChunk:
-    tipo: str  # "stdout" | "stderr" | "imagen" | "error" | "fin"
+    tipo: Literal["stdout", "stderr", "imagen", "error", "fin"]
     contenido: str
 
 @dataclass

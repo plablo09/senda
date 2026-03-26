@@ -5,7 +5,7 @@ from datetime import datetime
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 EstadoRender = Literal["pendiente", "procesando", "listo", "fallido"]
 
@@ -18,6 +18,12 @@ class DocumentoCreate(BaseModel):
 class DocumentoUpdate(BaseModel):
     titulo: str | None = None
     ast: dict | None = None
+
+    @model_validator(mode="after")
+    def at_least_one_field(self) -> "DocumentoUpdate":
+        if self.titulo is None and self.ast is None:
+            raise ValueError("Se requiere al menos un campo: titulo o ast")
+        return self
 
 
 class DocumentoResponse(BaseModel):
