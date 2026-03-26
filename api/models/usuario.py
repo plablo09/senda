@@ -12,6 +12,9 @@ from api.database import Base
 
 class Usuario(Base):
     __tablename__ = "usuarios"
+    __table_args__ = (
+        sa.CheckConstraint("rol IN ('teacher', 'student')", name="ck_usuarios_rol"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True, index=True)
