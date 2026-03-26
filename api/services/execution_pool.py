@@ -131,25 +131,53 @@ class ExecutionPool:
             exec_cmd = ["Rscript", "-e", code]
 
         try:
-            exec_id = await asyncio.to_thread(
+            _, stream = await asyncio.to_thread(
                 container.exec_run,
                 exec_cmd,
                 stream=True,
                 demux=True,
                 environment={"MPLBACKEND": "Agg"},  # non-interactive matplotlib backend
             )
-            # exec_run with stream=True returns (exit_code, generator)
-            _, stream = exec_id
 
-            async def read_stream():
-                for stdout_chunk, stderr_chunk in await asyncio.to_thread(list, stream):
-                    if stdout_chunk:
-                        yield OutputChunk(tipo="stdout", contenido=stdout_chunk.decode("utf-8", errors="replace"))
-                    if stderr_chunk:
-                        yield OutputChunk(tipo="stderr", contenido=stderr_chunk.decode("utf-8", errors="replace"))
+            loop = asyncio.get_running_loop()
+            queue: asyncio.Queue[OutputChunk | None] = asyncio.Queue()
 
-            async for chunk in read_stream():
-                yield chunk
+            def _read():
+                try:
+                    for stdout_chunk, stderr_chunk in stream:
+                        if stdout_chunk:
+                            loop.call_soon_threadsafe(
+                                queue.put_nowait,
+                                OutputChunk(
+                                    tipo="stdout",
+                                    contenido=stdout_chunk.decode("utf-8", errors="replace"),
+                                ),
+                            )
+                        if stderr_chunk:
+                            loop.call_soon_threadsafe(
+                                queue.put_nowait,
+                                OutputChunk(
+                                    tipo="stderr",
+                                    contenido=stderr_chunk.decode("utf-8", errors="replace"),
+                                ),
+                            )
+                finally:
+                    loop.call_soon_threadsafe(queue.put_nowait, None)
+
+            read_task = asyncio.create_task(asyncio.to_thread(_read))
+            try:
+                while True:
+                    chunk = await asyncio.wait_for(
+                        queue.get(), timeout=settings.exec_timeout_seconds
+                    )
+                    if chunk is None:
+                        break
+                    yield chunk
+            except asyncio.TimeoutError:
+                yield OutputChunk(tipo="error", contenido="Tiempo de ejecución excedido.")
+                return
+            finally:
+                read_task.cancel()
 
             yield OutputChunk(tipo="fin", contenido="")
 
