@@ -9,7 +9,8 @@ import type { Block } from "@blocknote/core";
 type SchemaBlock = Block<typeof schema.blockSchema>;
 
 interface Props {
-  initialContent?: SchemaBlock[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  initialContent?: any[];
   onChange?: (blocks: SchemaBlock[]) => void;
 }
 

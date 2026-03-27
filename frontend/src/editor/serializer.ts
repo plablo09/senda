@@ -188,6 +188,61 @@ function serializeBlock(block: Block): ASTBlock | null {
   }
 }
 
+// Loose type for BlockNote partial blocks returned to the editor.
+// BlockNote's PartialBlock<BSchema,...> is deeply generic; using Record avoids
+// threading schema type params through the serializer.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PartialEditorBlock = Record<string, any>;
+
+function astBlockToEditorBlock(block: ASTBlock): PartialEditorBlock | null {
+  switch (block.type) {
+    case "text": {
+      const headingMatch = block.text.match(/^(#{1,6}) (.*)$/);
+      if (headingMatch) {
+        return {
+          type: "heading",
+          props: { level: headingMatch[1].length },
+          content: [{ type: "text", text: headingMatch[2], styles: {} }],
+        };
+      }
+      return {
+        type: "paragraph",
+        content: block.text ? [{ type: "text", text: block.text, styles: {} }] : [],
+      };
+    }
+    case "exercise":
+      return {
+        type: "ejercicio",
+        props: {
+          exerciseId: block.attrs.exerciseId,
+          language: block.attrs.language,
+          caption: block.attrs.caption,
+          starterCode: block.attrs.starterCode,
+          solutionCode: block.attrs.solutionCode,
+          hints: JSON.stringify(block.attrs.hints),
+        },
+      };
+    case "nota":
+      return { type: "nota", props: { ...block.attrs } };
+    case "ecuacion":
+      return { type: "ecuacion", props: { ...block.attrs } };
+    case "cargadorDatos":
+      return { type: "cargadorDatos", props: { ...block.attrs } };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Converts a DocumentAST (from the backend) back into BlockNote-compatible partial blocks
+ * for use as initialContent in useCreateBlockNote.
+ */
+export function astToBlockNote(ast: DocumentAST): PartialEditorBlock[] {
+  return ast.blocks
+    .map(astBlockToEditorBlock)
+    .filter((b): b is PartialEditorBlock => b !== null);
+}
+
 /**
  * Converts a BlockNote Block[] to the DocumentAST payload expected by the Python backend.
  *
