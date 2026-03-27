@@ -120,6 +120,10 @@ services:
       senda.language: "python"
     deploy:
       replicas: 2
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
 
   exec-r:
     build:
@@ -131,6 +135,10 @@ services:
       senda.language: "r"
     deploy:
       replicas: 2
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
 
   ollama:
     profiles: [ollama]

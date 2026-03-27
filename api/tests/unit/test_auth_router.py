@@ -10,6 +10,10 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+from api.limiter import limiter
 from api.routers import auth as auth_router
 from api.database import get_db
 
@@ -25,6 +29,8 @@ async def _noop_lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 _test_app = FastAPI(lifespan=_noop_lifespan)
+_test_app.state.limiter = limiter
+_test_app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 _test_app.include_router(auth_router.router, prefix="/auth")
 
 
@@ -310,8 +316,10 @@ async def test_refresh_revoked_token_returns_401():
 
     _test_app.dependency_overrides[get_db] = _get_db_override
 
-    with patch("api.routers.auth.settings") as mock_cfg:
+    with patch("api.routers.auth.settings") as mock_cfg, \
+         patch("api.services.auth_service.settings") as mock_svc_cfg:
         mock_cfg.secret_key = _TEST_SECRET
+        mock_svc_cfg.secret_key = _TEST_SECRET
         async with AsyncClient(
             transport=ASGITransport(app=_test_app), base_url="http://test"
         ) as client:
@@ -359,6 +367,7 @@ async def test_refresh_valid_token_returns_new_access_token():
 
     new_jti = uuid.uuid4()
     with patch("api.routers.auth.settings") as mock_cfg, \
+         patch("api.services.auth_service.settings") as mock_svc_cfg, \
          patch("api.routers.auth.create_access_token", return_value="new_access_tok"), \
          patch("api.routers.auth.revoke_refresh_token", AsyncMock()), \
          patch("api.routers.auth.create_refresh_token", AsyncMock(return_value=("new_refresh_tok", new_jti))):
@@ -366,6 +375,7 @@ async def test_refresh_valid_token_returns_new_access_token():
         mock_cfg.access_token_expire_minutes = 15
         mock_cfg.refresh_token_expire_days = 7
         mock_cfg.cookie_secure = False
+        mock_svc_cfg.secret_key = _TEST_SECRET
         async with AsyncClient(
             transport=ASGITransport(app=_test_app), base_url="http://test"
         ) as client:

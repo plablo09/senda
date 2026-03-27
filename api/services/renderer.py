@@ -1,4 +1,5 @@
 from __future__ import annotations
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -18,7 +19,6 @@ def render_qmd(qmd_source: str, documento_id: str) -> bytes:
 
         # Copy the senda-live extension into the temp dir
         # The worker container has the repo at /app so extensions are at /app/_extensions
-        import shutil
         extensions_src = Path("/app/_extensions")
         if extensions_src.exists():
             shutil.copytree(extensions_src, tmp / "_extensions")

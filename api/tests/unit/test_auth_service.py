@@ -13,6 +13,7 @@ from api.services.auth_service import (
     hash_password,
     verify_access_token,
     verify_password,
+    verify_refresh_token,
 )
 
 _SECRET = "test-secret"
@@ -89,6 +90,60 @@ async def test_verify_access_token_invalid_raises_401():
         mock_cfg.secret_key = _SECRET
         with pytest.raises(HTTPException) as exc_info:
             await verify_access_token("not.a.token")
+
+    assert exc_info.value.status_code == 401
+    assert "inválido" in exc_info.value.detail
+
+
+# ---------------------------------------------------------------------------
+# verify_refresh_token
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_verify_refresh_token_valid():
+    jti = uuid.uuid4()
+    payload = {
+        "sub": str(uuid.uuid4()),
+        "jti": str(jti),
+        "exp": datetime.now(UTC) + timedelta(days=7),
+    }
+    token = jwt.encode(payload, _SECRET, algorithm=_ALGORITHM)
+    with patch("api.services.auth_service.settings") as mock_cfg:
+        mock_cfg.secret_key = _SECRET
+        result = await verify_refresh_token(token)
+
+    assert result.sub == payload["sub"]
+    assert result.jti == payload["jti"]
+
+
+@pytest.mark.asyncio
+async def test_verify_refresh_token_expired_raises_401():
+    from fastapi import HTTPException
+
+    payload = {
+        "sub": str(uuid.uuid4()),
+        "jti": str(uuid.uuid4()),
+        "exp": datetime.now(UTC) - timedelta(seconds=1),
+    }
+    token = jwt.encode(payload, _SECRET, algorithm=_ALGORITHM)
+    with patch("api.services.auth_service.settings") as mock_cfg:
+        mock_cfg.secret_key = _SECRET
+        with pytest.raises(HTTPException) as exc_info:
+            await verify_refresh_token(token)
+
+    assert exc_info.value.status_code == 401
+    assert "expirado" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+async def test_verify_refresh_token_invalid_raises_401():
+    from fastapi import HTTPException
+
+    with patch("api.services.auth_service.settings") as mock_cfg:
+        mock_cfg.secret_key = _SECRET
+        with pytest.raises(HTTPException) as exc_info:
+            await verify_refresh_token("not.a.token")
 
     assert exc_info.value.status_code == 401
     assert "inválido" in exc_info.value.detail

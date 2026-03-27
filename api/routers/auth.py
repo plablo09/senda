@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 
-import jwt
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlalchemy import select
 
@@ -12,13 +11,14 @@ from api.models.sesion_refresh import SesionRefresh
 from api.models.usuario import Usuario
 from api.dependencies.auth import CurrentUser
 from api.schemas.auth import LoginRequest, UsuarioCreate, UsuarioResponse
+from api.limiter import limiter
 from api.services.auth_service import (
-    _ALGORITHM,
     create_access_token,
     create_refresh_token,
     hash_password,
     revoke_refresh_token,
     verify_password,
+    verify_refresh_token,
 )
 
 router = APIRouter(tags=["auth"])
@@ -49,7 +49,8 @@ def _clear_auth_cookies(response: Response) -> None:
 
 
 @router.post("/registro", response_model=UsuarioResponse, status_code=status.HTTP_201_CREATED)
-async def registro(payload: UsuarioCreate, db: DbDep) -> Usuario:
+@limiter.limit("5/minute")
+async def registro(request: Request, payload: UsuarioCreate, db: DbDep) -> Usuario:
     result = await db.execute(select(Usuario).where(Usuario.email == payload.email))
     if result.scalar_one_or_none() is not None:
         raise HTTPException(
@@ -64,7 +65,8 @@ async def registro(payload: UsuarioCreate, db: DbDep) -> Usuario:
 
 
 @router.post("/login")
-async def login(payload: LoginRequest, response: Response, db: DbDep) -> dict:
+@limiter.limit("10/minute")
+async def login(request: Request, payload: LoginRequest, response: Response, db: DbDep) -> dict:
     result = await db.execute(select(Usuario).where(Usuario.email == payload.email))
     user = result.scalar_one_or_none()
     if not user or not user.hashed_password or not user.is_active:
@@ -78,43 +80,34 @@ async def login(payload: LoginRequest, response: Response, db: DbDep) -> dict:
     access_token = create_access_token(user.id, user.rol)
     refresh_token, _ = await create_refresh_token(user.id, db)
     _set_auth_cookies(response, access_token, refresh_token)
-    return {"mensaje": "Sesión iniciada"}
+    return {"mensaje": "Sesión iniciada", "access_token": access_token, "token_type": "bearer"}
 
 
 @router.post("/logout")
+@limiter.limit("20/minute")
 async def logout(request: Request, response: Response, db: DbDep) -> dict:
     refresh_token = request.cookies.get("refresh_token")
     if refresh_token:
         try:
-            payload = jwt.decode(
-                refresh_token, settings.secret_key, algorithms=[_ALGORITHM]
-            )
-            await revoke_refresh_token(uuid.UUID(payload["jti"]), db)
-        except (jwt.InvalidTokenError, KeyError, ValueError):
+            payload = await verify_refresh_token(refresh_token)
+            await revoke_refresh_token(uuid.UUID(payload.jti), db)
+        except HTTPException:
             pass  # token already invalid or malformed — proceed with clearing cookies
     _clear_auth_cookies(response)
     return {"mensaje": "Sesión cerrada"}
 
 
 @router.post("/refresh")
+@limiter.limit("30/minute")
 async def refresh(request: Request, response: Response, db: DbDep) -> dict:
     token = request.cookies.get("refresh_token")
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Sin token de refresco"
         )
-    try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[_ALGORITHM])
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de refresco expirado"
-        )
-    except jwt.InvalidTokenError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de refresco inválido"
-        )
+    payload = await verify_refresh_token(token)
 
-    jti = uuid.UUID(payload["jti"])
+    jti = uuid.UUID(payload.jti)
     result = await db.execute(select(SesionRefresh).where(SesionRefresh.jti == jti))
     session = result.scalar_one_or_none()
     if not session or session.revoked_at is not None:
@@ -122,7 +115,7 @@ async def refresh(request: Request, response: Response, db: DbDep) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de refresco revocado"
         )
 
-    user = await db.get(Usuario, uuid.UUID(payload["sub"]))
+    user = await db.get(Usuario, uuid.UUID(payload.sub))
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

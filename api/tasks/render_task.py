@@ -1,16 +1,23 @@
 from __future__ import annotations
 import asyncio
 import json as _json
+from datetime import datetime, UTC, timedelta
 
 import redis as redis_sync
+from sqlalchemy import select
 
 from api.celery_app import celery_app
+from api.config import settings
+from api.database import AsyncSessionLocal
+from api.models.documento import Documento
+from api.services.qmd_serializer import serialize_document
+from api.services.renderer import render_qmd, RenderError
+from api.services.storage import upload_html, ensure_bucket_exists
 
 
 def _publish_render_status(documento_id: str, status: str, url_artefacto: str | None, error_render: str | None) -> None:
     """Publish render completion to Redis pub/sub channel."""
     try:
-        from api.config import settings
         r = redis_sync.from_url(settings.redis_url)
         r.publish(f"render:{documento_id}", _json.dumps({
             "status": status,
@@ -27,13 +34,6 @@ def render_documento(self, documento_id: str):
     """
     Celery task: fetch documento → serialize to .qmd → quarto render → upload to MinIO → update DB.
     """
-    from api.database import AsyncSessionLocal
-    from api.models.documento import Documento
-    from api.services.qmd_serializer import serialize_document
-    from api.services.renderer import render_qmd, RenderError
-    from api.services.storage import upload_html, ensure_bucket_exists
-    from sqlalchemy import select
-
     async def _run():
         async with AsyncSessionLocal() as session:
             # Fetch documento
@@ -63,20 +63,20 @@ def render_documento(self, documento_id: str):
                 doc.estado_render = "listo"
                 doc.error_render = None
                 await session.commit()
-                _publish_render_status(documento_id, "listo", doc.url_artefacto, None)
+                _publish_render_status(str(doc.id), "listo", doc.url_artefacto, None)
             except RenderError as exc:
                 # Permanent failure — commit terminal state immediately
                 doc.estado_render = "fallido"
                 doc.error_render = str(exc)
                 await session.commit()
-                _publish_render_status(documento_id, "fallido", None, doc.error_render)
+                _publish_render_status(str(doc.id), "fallido", None, doc.error_render)
             except Exception as exc:
                 if self.request.retries >= self.max_retries:
                     # All retries exhausted — commit terminal state
                     doc.estado_render = "fallido"
                     doc.error_render = f"Error inesperado: {exc}"
                     await session.commit()
-                    _publish_render_status(documento_id, "fallido", None, doc.error_render)
+                    _publish_render_status(str(doc.id), "fallido", None, doc.error_render)
                 else:
                     # Transient failure — reset so retry starts clean
                     doc.estado_render = "pendiente"
@@ -90,11 +90,6 @@ def render_documento(self, documento_id: str):
 @celery_app.task
 def reset_stale_procesando():
     """Reset documents stuck in 'procesando' for > 10 minutes to 'fallido'."""
-    from datetime import datetime, UTC, timedelta
-    from api.database import AsyncSessionLocal
-    from api.models.documento import Documento
-    from sqlalchemy import select
-
     async def _run():
         cutoff = datetime.now(UTC) - timedelta(minutes=10)
         async with AsyncSessionLocal() as session:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta, UTC
 
 import bcrypt
@@ -15,6 +16,12 @@ from api.models.sesion_refresh import SesionRefresh
 from api.schemas.auth import TokenPayload
 
 _ALGORITHM = "HS256"
+
+
+@dataclass
+class RefreshPayload:
+    sub: str
+    jti: str
 
 
 async def hash_password(plain: str) -> str:
@@ -62,6 +69,22 @@ async def verify_access_token(token: str) -> TokenPayload:
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
     return TokenPayload(sub=payload["sub"], rol=payload["rol"])
+
+
+async def verify_refresh_token(token: str) -> RefreshPayload:
+    try:
+        payload = await asyncio.to_thread(
+            jwt.decode, token, settings.secret_key, algorithms=[_ALGORITHM]
+        )
+        return RefreshPayload(sub=payload["sub"], jti=payload["jti"])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de refresco expirado"
+        )
+    except (jwt.InvalidTokenError, KeyError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de refresco inválido"
+        )
 
 
 async def revoke_refresh_token(jti: uuid.UUID, db: AsyncSession) -> None:
