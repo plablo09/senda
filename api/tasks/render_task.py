@@ -5,10 +5,11 @@ from datetime import datetime, UTC, timedelta
 
 import redis as redis_sync
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.pool import NullPool
 
 from api.celery_app import celery_app
 from api.config import settings
-from api.database import AsyncSessionLocal
 from api.models.documento import Documento
 from api.services.qmd_serializer import serialize_document
 from api.services.renderer import render_qmd, RenderError
@@ -29,60 +30,78 @@ def _publish_render_status(documento_id: str, status: str, url_artefacto: str | 
         pass  # best-effort — DB is already committed
 
 
+def _make_engine():
+    """Create a NullPool engine for use inside a Celery task.
+
+    Each asyncio.run() call in a Celery worker creates a fresh event loop.
+    The shared module-level engine in api.database uses a connection pool whose
+    internal asyncpg futures are bound to the loop that was current when the pool
+    was created — a different loop than the one the task runs in. Using NullPool
+    avoids pooling entirely, so every connection is opened and closed within the
+    same event loop that owns the task.
+    """
+    return create_async_engine(settings.database_url, poolclass=NullPool)
+
+
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=10)
 def render_documento(self, documento_id: str):
     """
     Celery task: fetch documento → serialize to .qmd → quarto render → upload to MinIO → update DB.
     """
     async def _run():
-        async with AsyncSessionLocal() as session:
-            # Fetch documento
-            result = await session.execute(select(Documento).where(Documento.id == documento_id))
-            doc = result.scalar_one_or_none()
-            if not doc:
-                return
+        engine = _make_engine()
+        try:
+            session_factory = async_sessionmaker(engine, expire_on_commit=False)
+            async with session_factory() as session:
+                # Fetch documento
+                result = await session.execute(select(Documento).where(Documento.id == documento_id))
+                doc = result.scalar_one_or_none()
+                if not doc:
+                    return
 
-            # Mark as processing
-            doc.estado_render = "procesando"
-            await session.commit()
-
-            try:
-                # Serialize AST → .qmd
-                qmd_source = serialize_document(doc.ast or {}, titulo=doc.titulo)
-                doc.qmd_source = qmd_source
-
-                # Render
-                ensure_bucket_exists()
-                html_bytes = render_qmd(qmd_source, str(doc.id))
-
-                # Upload
-                url = upload_html(str(doc.id), html_bytes)
-
-                # Update
-                doc.url_artefacto = url
-                doc.estado_render = "listo"
-                doc.error_render = None
+                # Mark as processing
+                doc.estado_render = "procesando"
                 await session.commit()
-                _publish_render_status(str(doc.id), "listo", doc.url_artefacto, None)
-            except RenderError as exc:
-                # Permanent failure — commit terminal state immediately
-                doc.estado_render = "fallido"
-                doc.error_render = str(exc)
-                await session.commit()
-                _publish_render_status(str(doc.id), "fallido", None, doc.error_render)
-            except Exception as exc:
-                if self.request.retries >= self.max_retries:
-                    # All retries exhausted — commit terminal state
-                    doc.estado_render = "fallido"
-                    doc.error_render = f"Error inesperado: {exc}"
-                    await session.commit()
-                    _publish_render_status(str(doc.id), "fallido", None, doc.error_render)
-                else:
-                    # Transient failure — reset so retry starts clean
-                    doc.estado_render = "pendiente"
+
+                try:
+                    # Serialize AST → .qmd
+                    qmd_source = serialize_document(doc.ast or {}, titulo=doc.titulo)
+                    doc.qmd_source = qmd_source
+
+                    # Render
+                    ensure_bucket_exists()
+                    html_bytes = render_qmd(qmd_source, str(doc.id))
+
+                    # Upload
+                    url = upload_html(str(doc.id), html_bytes)
+
+                    # Update
+                    doc.url_artefacto = url
+                    doc.estado_render = "listo"
                     doc.error_render = None
                     await session.commit()
-                    raise self.retry(exc=exc)
+                    _publish_render_status(str(doc.id), "listo", doc.url_artefacto, None)
+                except RenderError as exc:
+                    # Permanent failure — commit terminal state immediately
+                    doc.estado_render = "fallido"
+                    doc.error_render = str(exc)
+                    await session.commit()
+                    _publish_render_status(str(doc.id), "fallido", None, doc.error_render)
+                except Exception as exc:
+                    if self.request.retries >= self.max_retries:
+                        # All retries exhausted — commit terminal state
+                        doc.estado_render = "fallido"
+                        doc.error_render = f"Error inesperado: {exc}"
+                        await session.commit()
+                        _publish_render_status(str(doc.id), "fallido", None, doc.error_render)
+                    else:
+                        # Transient failure — reset so retry starts clean
+                        doc.estado_render = "pendiente"
+                        doc.error_render = None
+                        await session.commit()
+                        raise self.retry(exc=exc)
+        finally:
+            await engine.dispose()
 
     asyncio.run(_run())
 
@@ -91,21 +110,26 @@ def render_documento(self, documento_id: str):
 def reset_stale_procesando():
     """Reset documents stuck in 'procesando' for > 10 minutes to 'fallido'."""
     async def _run():
-        cutoff = datetime.now(UTC) - timedelta(minutes=10)
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(Documento).where(
-                    Documento.estado_render == "procesando",
-                    Documento.updated_at < cutoff,
+        engine = _make_engine()
+        try:
+            session_factory = async_sessionmaker(engine, expire_on_commit=False)
+            cutoff = datetime.now(UTC) - timedelta(minutes=10)
+            async with session_factory() as session:
+                result = await session.execute(
+                    select(Documento).where(
+                        Documento.estado_render == "procesando",
+                        Documento.updated_at < cutoff,
+                    )
                 )
-            )
-            stale = result.scalars().all()
-            for doc in stale:
-                doc.estado_render = "fallido"
-                doc.error_render = "Tiempo de procesamiento agotado"
-            if stale:
-                await session.commit()
+                stale = result.scalars().all()
                 for doc in stale:
-                    _publish_render_status(str(doc.id), "fallido", None, doc.error_render)
+                    doc.estado_render = "fallido"
+                    doc.error_render = "Tiempo de procesamiento agotado"
+                if stale:
+                    await session.commit()
+                    for doc in stale:
+                        _publish_render_status(str(doc.id), "fallido", None, doc.error_render)
+        finally:
+            await engine.dispose()
 
     asyncio.run(_run())

@@ -23,8 +23,19 @@ def get_s3_client() -> boto3.client:
         region_name="us-east-1",  # required by boto3, value doesn't matter for MinIO
     )
 
+_PUBLIC_READ_POLICY = """{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {"AWS": ["*"]},
+    "Action": ["s3:GetObject"],
+    "Resource": ["arn:aws:s3:::{bucket}/*"]
+  }]
+}"""
+
+
 def ensure_bucket_exists() -> None:
-    """Create the bucket if it doesn't exist. Safe to call on startup."""
+    """Create the bucket if it doesn't exist and ensure public-read policy. Safe to call on startup."""
     client = get_s3_client()
     try:
         client.head_bucket(Bucket=settings.storage_bucket)
@@ -33,6 +44,10 @@ def ensure_bucket_exists() -> None:
             client.create_bucket(Bucket=settings.storage_bucket)
         else:
             raise
+    client.put_bucket_policy(
+        Bucket=settings.storage_bucket,
+        Policy=_PUBLIC_READ_POLICY.format(bucket=settings.storage_bucket),
+    )
 
 def upload_html(documento_id: str, html_content: bytes) -> str:
     """Upload rendered HTML and return the public URL."""
