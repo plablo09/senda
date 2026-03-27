@@ -59,12 +59,21 @@ interface CargadorDatosASTBlock {
   };
 }
 
+interface CodeASTBlock {
+  type: "code";
+  attrs: {
+    language: string;
+    content: string;
+  };
+}
+
 type ASTBlock =
   | TextASTBlock
   | ExerciseASTBlock
   | NotaASTBlock
   | EcuacionASTBlock
-  | CargadorDatosASTBlock;
+  | CargadorDatosASTBlock
+  | CodeASTBlock;
 
 interface DocumentAST {
   execution_url: string;
@@ -183,6 +192,17 @@ function serializeBlock(block: Block): ASTBlock | null {
       };
     }
 
+    case "codeBlock": {
+      const { language, content } = block.props;
+      return {
+        type: "code",
+        attrs: {
+          language: typeof language === "string" ? language : "python",
+          content: typeof content === "string" ? content : "",
+        },
+      };
+    }
+
     default:
       return null;
   }
@@ -228,6 +248,8 @@ function astBlockToEditorBlock(block: ASTBlock): PartialEditorBlock | null {
       return { type: "ecuacion", props: { ...block.attrs } };
     case "cargadorDatos":
       return { type: "cargadorDatos", props: { ...block.attrs } };
+    case "code":
+      return { type: "codeBlock", props: { ...block.attrs } };
     default:
       return null;
   }
