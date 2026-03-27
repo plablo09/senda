@@ -80,7 +80,7 @@ async def login(request: Request, payload: LoginRequest, response: Response, db:
     access_token = create_access_token(user.id, user.rol)
     refresh_token, _ = await create_refresh_token(user.id, db)
     _set_auth_cookies(response, access_token, refresh_token)
-    return {"mensaje": "Sesión iniciada"}
+    return {"mensaje": "Sesión iniciada", "access_token": access_token, "token_type": "bearer"}
 
 
 @router.post("/logout")

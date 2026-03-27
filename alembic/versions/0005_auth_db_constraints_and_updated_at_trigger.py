@@ -39,7 +39,7 @@ def upgrade() -> None:
     """)
 
     op.execute("""
-        CREATE TRIGGER usuarios_set_updated_at
+        CREATE OR REPLACE TRIGGER usuarios_set_updated_at
         BEFORE UPDATE ON usuarios
         FOR EACH ROW EXECUTE FUNCTION set_updated_at();
     """)
@@ -47,5 +47,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute("DROP TRIGGER IF EXISTS usuarios_set_updated_at ON usuarios;")
-    op.execute("DROP FUNCTION IF EXISTS set_updated_at;")
+    # NOTE: set_updated_at() is a shared function intended for reuse across tables.
+    # Do not drop it here — a future migration may have attached it to other tables.
+    # Drop it only in a dedicated teardown migration once no triggers reference it.
     op.drop_constraint("ck_usuarios_rol", "usuarios", type_="check")

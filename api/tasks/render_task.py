@@ -34,13 +34,6 @@ def render_documento(self, documento_id: str):
     """
     Celery task: fetch documento → serialize to .qmd → quarto render → upload to MinIO → update DB.
     """
-    from api.database import AsyncSessionLocal
-    from api.models.documento import Documento
-    from api.services.qmd_serializer import serialize_document
-    from api.services.renderer import render_qmd, RenderError
-    from api.services.storage import upload_html, ensure_bucket_exists
-    from sqlalchemy import select
-
     async def _run():
         async with AsyncSessionLocal() as session:
             # Fetch documento
