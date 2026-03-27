@@ -1,5 +1,5 @@
 ---
-status: complete
+status: pending
 priority: p1
 issue_id: "022"
 tags: [code-review, agent-native, auth]
@@ -10,14 +10,15 @@ dependencies: []
 
 ## Problem Statement
 
-All auth uses httpOnly cookies exclusively. No LLM agent runtime (Claude Code, CI pipelines, test scripts) can read httpOnly cookies or forward them. Once Phase 4 wires `require_teacher`/`require_student` onto existing routers, agents will lose access to the entire authenticated API surface. Currently 8/8 non-auth endpoints are accessible; post-Phase 4 this drops to 0/8 without a fix.
+Once Phase 3 wires `require_teacher`/`require_student` onto routers, agents will lose access to all protected endpoints unless they can present a bearer token. The bearer fallback in `get_current_user` IS implemented. The missing piece: `POST /auth/login` still returns `{"mensaje": "Sesión iniciada"}` with no token in the body, so agents cannot extract the access token to use as a bearer credential.
 
 ## Findings
 
-- `api/dependencies/auth.py:17`: `token = request.cookies.get("access_token")` — only source of credentials
-- `api/routers/auth.py:87`: login returns `{"mensaje": "Sesión iniciada"}` with no token in the body — agents cannot extract the access token even if they could call login
-- `api/routers/documentos.py`, `api/routers/datasets.py`: currently unprotected; will gain `require_teacher` in Phase 4
-- Agent-native reviewer: 4/10 auth capabilities accessible today; will drop to ~0 after Phase 4 without this fix
+- `api/dependencies/auth.py:14-18` — ✅ bearer fallback IMPLEMENTED: tries cookie first, then `Authorization: Bearer` header
+- `api/routers/auth.py:83` — ❌ login returns `{"mensaje": "Sesión iniciada"}` — no `access_token` in body
+- Acceptance criterion "POST /auth/login response body includes access_token and token_type" NOT MET
+- Remaining work: one-line change to login response body
+- Confirmed: agent-native-reviewer (Critical #2), 2026-03-26 ce-review
 
 ## Proposed Solutions
 
@@ -95,6 +96,7 @@ Option 1 before Phase 4's first `require_teacher` guard ships. The change is loc
 
 ## Acceptance Criteria
 
+- [x] `get_current_user` supports `Authorization: Bearer <token>` header fallback
 - [ ] `GET /documentos` (once protected) returns 200 with `Authorization: Bearer <token>` header
 - [ ] `GET /documentos` returns 200 with `access_token` cookie as before
 - [ ] `POST /auth/login` response body includes `access_token` and `token_type`
@@ -110,3 +112,14 @@ Option 1 before Phase 4's first `require_teacher` guard ships. The change is loc
 **Actions:**
 - Agent-native reviewer flagged as P1; confirmed by architecture reviewer
 - Fix is isolated to one dependency function + one login response change
+
+### 2026-03-26 - Partially implemented; re-opened
+
+**By:** Claude Code (ce-review)
+
+**Actions:**
+- `api/dependencies/auth.py` bearer fallback confirmed implemented (lines 15-18)
+- `api/routers/auth.py:83` login response body still returns `{"mensaje": "Sesión iniciada"}` — no token
+- Marked as pending; only remaining work is adding `access_token` + `token_type` to login response
+
+**Remaining work:** `api/routers/auth.py:83` — return `{"mensaje": "Sesión iniciada", "access_token": access_token, "token_type": "bearer"}`
