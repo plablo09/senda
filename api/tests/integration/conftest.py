@@ -96,7 +96,7 @@ async def auth_token(client: httpx.AsyncClient, registered_user: dict) -> str:
 
 
 @pytest.fixture
-def auth_headers(auth_token: str) -> dict:
+async def auth_headers(auth_token: str) -> dict[str, str]:
     """Authorization header dict for authenticated requests."""
     return {"Authorization": f"Bearer {auth_token}"}
 
@@ -178,9 +178,15 @@ async def _wait_for_render(
         if doc["estado_render"] in ("listo", "fallido"):
             return doc
         await asyncio.sleep(1.0)
-    # Return whatever state we have on timeout
+    # Timeout — fail loudly with diagnostic context
     resp = await client.get(f"/documentos/{doc_id}")
-    return resp.json()
+    assert resp.status_code == 200, resp.text
+    doc = resp.json()
+    raise AssertionError(
+        f"Render did not reach terminal state within {timeout}s. "
+        f"Last estado_render={doc.get('estado_render')!r}, "
+        f"error_render={doc.get('error_render')!r}"
+    )
 
 
 @pytest.fixture

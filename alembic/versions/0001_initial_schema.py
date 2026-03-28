@@ -62,4 +62,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute("DROP TABLE IF EXISTS datasets")
     op.execute("DROP TABLE IF EXISTS ejecucion_errores")
-    op.drop_table("documentos")
+    op.execute("DROP TABLE IF EXISTS documentos")
