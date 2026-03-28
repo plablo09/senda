@@ -28,6 +28,17 @@ import pytest
 
 BASE_URL = "http://api:8000"
 
+# Storage: url_artefacto uses STORAGE_PUBLIC_ENDPOINT (e.g. http://localhost:9000)
+# which is only reachable from the host machine. Inside Docker, MinIO is at
+# STORAGE_ENDPOINT (http://minio:9000). Rewrite before making requests.
+_PUBLIC_ENDPOINT = "http://localhost:9000"
+_INTERNAL_ENDPOINT = "http://minio:9000"
+
+
+def internal_artifact_url(url: str) -> str:
+    """Rewrite a public artifact URL to the Docker-internal MinIO endpoint."""
+    return url.replace(_PUBLIC_ENDPOINT, _INTERNAL_ENDPOINT, 1)
+
 
 # ---------------------------------------------------------------------------
 # HTTP client
@@ -46,15 +57,27 @@ async def client() -> AsyncGenerator[httpx.AsyncClient, None]:
 
 
 def _random_email() -> str:
-    return f"test-{uuid.uuid4().hex[:8]}@senda-test.local"
+    # .local is a reserved TLD rejected by email-validator; use .com
+    return f"test-{uuid.uuid4().hex[:8]}@senda-test.com"
 
 
-@pytest.fixture
-async def registered_user(client: httpx.AsyncClient) -> dict:
-    """Registers a student account. Returns {email, password, id}."""
+@pytest.fixture(scope="module")
+def registered_user() -> dict:
+    """
+    Registers a student account once per test module (sync).
+
+    Module scope avoids repeated POST /auth/registro calls that would exhaust
+    the 5/min rate limit when many tests share this fixture. Sync so it has no
+    async event-loop dependency — pytest-asyncio module-scoped async fixtures
+    need an explicit module-level event loop which adds setup complexity.
+
+    Each test that needs a session calls login separately (auth_token /
+    login_response are function-scoped), so they get independent tokens.
+    """
     email = _random_email()
     password = "Test1234!"
-    resp = await client.post("/auth/registro", json={"email": email, "password": password})
+    with httpx.Client(base_url=BASE_URL, timeout=30.0) as c:
+        resp = c.post("/auth/registro", json={"email": email, "password": password})
     assert resp.status_code == 201, resp.text
     return {"email": email, "password": password, "id": resp.json()["id"]}
 

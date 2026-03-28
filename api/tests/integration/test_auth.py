@@ -14,6 +14,8 @@ from __future__ import annotations
 import httpx
 import pytest
 
+from tests.integration.conftest import BASE_URL
+
 # ---------------------------------------------------------------------------
 # Happy path
 # ---------------------------------------------------------------------------
@@ -80,9 +82,10 @@ async def test_refresh_returns_new_token(
             break
     assert refresh_token, "refresh_token cookie not set by login"
 
-    resp = await client.post(
-        "/auth/refresh", cookies={"refresh_token": refresh_token}
-    )
+    async with httpx.AsyncClient(
+        base_url=BASE_URL, timeout=30.0, cookies={"refresh_token": refresh_token}
+    ) as cookie_client:
+        resp = await cookie_client.post("/auth/refresh")
     assert resp.status_code == 200
     # New cookies must be set
     new_cookie_names = [c.split("=")[0] for c in resp.headers.get_list("set-cookie")]
@@ -102,11 +105,17 @@ async def test_refresh_token_rotation_revokes_original(
     assert refresh_token
 
     # First use: should succeed
-    resp1 = await client.post("/auth/refresh", cookies={"refresh_token": refresh_token})
+    async with httpx.AsyncClient(
+        base_url=BASE_URL, timeout=30.0, cookies={"refresh_token": refresh_token}
+    ) as cookie_client:
+        resp1 = await cookie_client.post("/auth/refresh")
     assert resp1.status_code == 200
 
     # Second use of the same token: must be rejected (rotation)
-    resp2 = await client.post("/auth/refresh", cookies={"refresh_token": refresh_token})
+    async with httpx.AsyncClient(
+        base_url=BASE_URL, timeout=30.0, cookies={"refresh_token": refresh_token}
+    ) as cookie_client:
+        resp2 = await cookie_client.post("/auth/refresh")
     assert resp2.status_code == 401
 
 
@@ -127,15 +136,17 @@ async def test_logout_clears_session(
     assert refresh_token
 
     # Logout
-    logout_resp = await client.post(
-        "/auth/logout", cookies={"refresh_token": refresh_token}
-    )
+    async with httpx.AsyncClient(
+        base_url=BASE_URL, timeout=30.0, cookies={"refresh_token": refresh_token}
+    ) as cookie_client:
+        logout_resp = await cookie_client.post("/auth/logout")
     assert logout_resp.status_code == 200
 
     # The revoked refresh token must no longer work
-    refresh_resp = await client.post(
-        "/auth/refresh", cookies={"refresh_token": refresh_token}
-    )
+    async with httpx.AsyncClient(
+        base_url=BASE_URL, timeout=30.0, cookies={"refresh_token": refresh_token}
+    ) as cookie_client:
+        refresh_resp = await cookie_client.post("/auth/refresh")
     assert refresh_resp.status_code == 401
 
 
@@ -145,17 +156,16 @@ async def test_logout_clears_session(
 
 
 @pytest.mark.asyncio
-async def test_registro_duplicate_email_returns_409(client: httpx.AsyncClient):
-    from tests.integration.conftest import _random_email
-
-    email = _random_email()
-    payload = {"email": email, "password": "Test1234!"}
-    first = await client.post("/auth/registro", json=payload)
-    assert first.status_code == 201
-
-    second = await client.post("/auth/registro", json=payload)
-    assert second.status_code == 409
-    assert "409" not in str(second.status_code) or second.status_code == 409  # sanity
+async def test_registro_duplicate_email_returns_409(
+    client: httpx.AsyncClient, registered_user: dict
+):
+    # Reuse the already-registered user's email — avoids an extra registro call
+    # that could exhaust the 5/min rate limit.
+    resp = await client.post(
+        "/auth/registro",
+        json={"email": registered_user["email"], "password": "OtherPass1!"},
+    )
+    assert resp.status_code == 409
 
 
 @pytest.mark.asyncio

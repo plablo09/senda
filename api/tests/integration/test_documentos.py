@@ -24,6 +24,7 @@ from tests.integration.conftest import (
     FULL_AST,
     MINIMAL_AST,
     _wait_for_render,
+    internal_artifact_url,
 )
 
 # ---------------------------------------------------------------------------
@@ -124,8 +125,10 @@ async def test_render_artifact_is_publicly_accessible(
     url = rendered_document["url_artefacto"]
     assert url is not None
 
+    # Rewrite localhost→minio: tests run inside Docker where the public endpoint
+    # is unreachable; the internal endpoint exercises the same bucket policy.
     async with httpx.AsyncClient(timeout=15.0) as anon_client:
-        resp = await anon_client.get(url)
+        resp = await anon_client.get(internal_artifact_url(url))
     assert resp.status_code == 200, (
         f"Artifact URL returned {resp.status_code}. "
         "Likely a MinIO public-read policy regression (see Bug 4)."
@@ -141,7 +144,7 @@ async def test_render_produces_html(
     url = rendered_document["url_artefacto"]
 
     async with httpx.AsyncClient(timeout=15.0) as anon_client:
-        resp = await anon_client.get(url)
+        resp = await anon_client.get(internal_artifact_url(url))
     assert resp.status_code == 200
     content = resp.text.lower()
     assert "<html" in content, "Artifact does not appear to be HTML"
