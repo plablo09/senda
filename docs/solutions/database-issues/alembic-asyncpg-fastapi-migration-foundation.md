@@ -239,6 +239,7 @@ Once Alembic is in place, `create_all()` is not just redundant — it's dangerou
 | ORM `default=` without `server_default=` | Raw SQL inserts get `NULL` | Add both |
 | `service_healthy` on one-shot `migrator` | `api` never starts | Use `service_completed_successfully` |
 | Non-empty `sqlalchemy.url` in `alembic.ini` with URL set in `env.py` | `alembic.ini` value shadows `env.py` | Leave blank in `alembic.ini` |
+| Bare `op.drop_table()` in `downgrade()` without `IF EXISTS` | `ProgrammingError: table does not exist` on a database that was stamped but never migrated (e.g., fresh CI environment) | Use `op.execute("DROP TABLE IF EXISTS table_name")` — `op.drop_table()` has no `if_exists` parameter in Alembic's standard API |
 
 ---
 
@@ -258,6 +259,8 @@ Once Alembic is in place, `create_all()` is not just redundant — it's dangerou
 - [ ] Review the generated file — autogenerate is not perfect
 - [ ] Verify `server_default` values match ORM `default` values
 - [ ] Verify `downgrade()` reverses `upgrade()` completely
+- [ ] Every `drop_table` / `drop_index` / `drop_constraint` in `downgrade()` uses `IF EXISTS` — count them against the operations in `upgrade()` and verify the numbers match (`op.drop_table()` has no `if_exists` param; use `op.execute("DROP TABLE IF EXISTS ...")`)
+- [ ] Idempotency check: `alembic upgrade head && alembic downgrade base && alembic upgrade head` — all three must exit 0
 - [ ] Run `make migrate` locally to confirm it applies cleanly
 
 ### Detection
@@ -282,3 +285,4 @@ grep "import api.models" alembic/env.py
 
 - [`docs/solutions/runtime-errors/docker-compose-stack-startup-failures.md`](../runtime-errors/docker-compose-stack-startup-failures.md) — `service_completed_successfully` pattern and `pg_isready` healthcheck
 - [`docs/solutions/runtime-errors/async-python-fastapi-sqlalchemy-impl-pitfalls.md`](../runtime-errors/async-python-fastapi-sqlalchemy-impl-pitfalls.md) — asyncpg vs psycopg2 dialect differences
+- [`docs/solutions/test-failures/pytest-asyncio-fixture-scope-alembic-missing-guard-polling-timeout.md`](../test-failures/pytest-asyncio-fixture-scope-alembic-missing-guard-polling-timeout.md) — concrete case study: `op.drop_table()` without `IF EXISTS` on 1 of 3 tables causing fresh-DB downgrade crash (PR #8 code review)
