@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 import pathlib
 import re
 import boto3
@@ -24,7 +25,7 @@ def get_s3_client() -> boto3.client:
     )
 
 def ensure_bucket_exists() -> None:
-    """Create the bucket if it doesn't exist. Safe to call on startup."""
+    """Create the bucket if it doesn't exist and ensure public-read policy. Safe to call on startup."""
     client = get_s3_client()
     try:
         client.head_bucket(Bucket=settings.storage_bucket)
@@ -33,6 +34,16 @@ def ensure_bucket_exists() -> None:
             client.create_bucket(Bucket=settings.storage_bucket)
         else:
             raise
+    policy = json.dumps({
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Principal": {"AWS": ["*"]},
+            "Action": ["s3:GetObject"],
+            "Resource": [f"arn:aws:s3:::{settings.storage_bucket}/*"],
+        }],
+    })
+    client.put_bucket_policy(Bucket=settings.storage_bucket, Policy=policy)
 
 def upload_html(documento_id: str, html_content: bytes) -> str:
     """Upload rendered HTML and return the public URL."""

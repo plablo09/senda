@@ -4,7 +4,7 @@ import type { Block } from "@blocknote/core";
 import type { Block as SerBlock } from "../editor/serializer";
 import { SendaEditor } from "../editor/SendaEditor";
 import { schema } from "../editor/schema";
-import { blockNoteToAST } from "../editor/serializer";
+import { blockNoteToAST, astToBlockNote } from "../editor/serializer";
 import { obtener, crear, actualizar } from "../api/documentos";
 import { useRenderStatus } from "../hooks/useRenderStatus";
 import type { EstadoRender, DocumentoAST } from "../api/types";
@@ -166,6 +166,8 @@ export function Editor() {
 
   const [titulo, setTitulo] = useState("");
   const [blocks, setBlocks] = useState<Block<typeof schema.blockSchema>[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [initialBlocks, setInitialBlocks] = useState<any[] | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
@@ -185,7 +187,9 @@ export function Editor() {
     obtener(id)
       .then((doc) => {
         setTitulo(doc.titulo);
-        // initialContent is set via SendaEditor props
+        if (doc.ast) {
+          setInitialBlocks(astToBlockNote(doc.ast));
+        }
       })
       .catch(() => {
         showToast(t("editor.error_guardar"), "error");
@@ -380,7 +384,7 @@ export function Editor() {
       {/* Main area */}
       <div style={mainAreaStyle}>
         <div style={editorPaneStyle}>
-          <SendaEditor onChange={handleBlocksChange} />
+          <SendaEditor key={id ?? "new"} initialContent={initialBlocks} onChange={handleBlocksChange} />
         </div>
 
         {/* Preview panel */}
